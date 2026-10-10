@@ -27,9 +27,16 @@ function stableSnapshot(frequency: number): AudioSnapshot {
   }
 }
 
+async function renderApp() {
+  const view = render(<App />)
+  await screen.findByRole('button', { name: 'Start practice' })
+  return view
+}
+
 describe('App', () => {
   beforeEach(() => {
     localStorage.clear()
+    window.history.replaceState(null, '', '/')
     vi.spyOn(Math, 'random').mockReturnValue(0)
     microphone.callback = undefined
     microphone.start.mockClear()
@@ -42,17 +49,19 @@ describe('App', () => {
     vi.useRealTimers()
   })
 
-  it('opens directly in note-name practice with the tuner in the footer', () => {
+  it('opens directly in note-name practice with routed tool tabs', async () => {
     render(<App />)
 
-    expect(screen.getByText('PLAY THIS NOTE')).toBeTruthy()
+    expect(await screen.findByText('PLAY THIS NOTE')).toBeTruthy()
     expect(screen.getByLabelText('Play C')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Start practice' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Need to tune? Open tuner' })).toBeTruthy()
+    expect(screen.getByRole('navigation', { name: 'Tools' })).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Tuner' }).getAttribute('href')).toBe('/tuner')
+    expect(screen.getByRole('link', { name: 'Metronome' }).getAttribute('href')).toBe('/metronome')
   })
 
   it('matches any octave in note-name mode and gives green feedback', async () => {
-    render(<App />)
+    await renderApp()
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Start practice' })))
 
     act(() => microphone.callback?.(stableSnapshot(65.4064))) // C2
@@ -62,8 +71,8 @@ describe('App', () => {
   })
 
   it('advances hands-free after a short success confirmation', async () => {
+    await renderApp()
     vi.useFakeTimers()
-    render(<App />)
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Start practice' })))
     act(() => microphone.callback?.(stableSnapshot(65.4064))) // target C
 
@@ -75,7 +84,7 @@ describe('App', () => {
   })
 
   it('shows red feedback only for a stable wrong note', async () => {
-    render(<App />)
+    await renderApp()
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Start practice' })))
 
     act(() => microphone.callback?.({ ...stableSnapshot(73.416), reading: { ...stableSnapshot(73.416).reading!, stable: false } }))
@@ -86,7 +95,7 @@ describe('App', () => {
   })
 
   it('remembers bass-clef mode and requires the exact pitch', async () => {
-    render(<App />)
+    await renderApp()
     fireEvent.click(screen.getByRole('button', { name: 'Bass clef' }))
 
     expect(localStorage.getItem('bass-note-finder-mode')).toBe('staff')
@@ -98,19 +107,39 @@ describe('App', () => {
     expect(screen.getByText('Try another note')).toBeTruthy()
   })
 
-  it('opens the tuner without creating another microphone session', async () => {
-    render(<App />)
+  it('routes to the tuner without creating another microphone session', async () => {
+    await renderApp()
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Start practice' })))
     act(() => microphone.callback?.(stableSnapshot(30.8677)))
-    fireEvent.click(screen.getByRole('button', { name: 'Need to tune? Open tuner' }))
+    fireEvent.click(screen.getByRole('link', { name: 'Tuner' }))
 
-    expect(screen.getByText('TUNER')).toBeTruthy()
+    expect(await screen.findByText('TUNER')).toBeTruthy()
+    expect(window.location.pathname).toBe('/tuner')
     expect(screen.getByText('30.87')).toBeTruthy()
     expect(microphone.start).toHaveBeenCalledOnce()
   })
 
+  it('routes to a configurable metronome and saves its settings', async () => {
+    await renderApp()
+    fireEvent.click(screen.getByRole('link', { name: 'Metronome' }))
+
+    expect(await screen.findByRole('region', { name: 'Metronome' })).toBeTruthy()
+    expect(window.location.pathname).toBe('/metronome')
+    expect(screen.getByRole('spinbutton', { name: 'Tempo in BPM' }).getAttribute('value')).toBe('80')
+    fireEvent.click(screen.getByRole('button', { name: '♬ 16th' }))
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Tempo in BPM' }), { target: { value: '96' } })
+    expect((screen.getByRole('combobox', { name: 'SOUND' }) as HTMLSelectElement).value).toBe('woodblock')
+    fireEvent.change(screen.getByRole('combobox', { name: 'SOUND' }), { target: { value: 'drums' } })
+    fireEvent.change(screen.getByRole('slider', { name: 'Volume' }), { target: { value: '0.4' } })
+
+    expect(localStorage.getItem('bass-metronome-settings')).toContain('"bpm":96')
+    expect(localStorage.getItem('bass-metronome-settings')).toContain('"sound":"drums"')
+    expect(localStorage.getItem('bass-metronome-settings')).toContain('"volume":0.4')
+    expect(screen.getByLabelText('4 beat bar with 4 subdivisions per beat').children).toHaveLength(16)
+  })
+
   it('stops an active analyzer when the component unmounts', async () => {
-    const view = render(<App />)
+    const view = await renderApp()
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Start practice' })))
     view.unmount()
     expect(microphone.stop).toHaveBeenCalledOnce()

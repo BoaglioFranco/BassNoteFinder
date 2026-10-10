@@ -1,4 +1,13 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import {
+  createRootRoute,
+  createRoute,
+  createRouter,
+  Link,
+  Outlet,
+  RouterProvider,
+  useRouterState,
+} from '@tanstack/react-router'
 import { BassMicrophoneAnalyzer, type AudioSnapshot } from './audio/microphone'
 import { frequencyToNote } from './audio/pitch'
 import {
@@ -7,27 +16,47 @@ import {
   type ExerciseTarget,
   type PracticeMode,
 } from './exercise'
+import Metronome from './Metronome'
 import './styles.css'
 
 const initialSnapshot: AudioSnapshot = { state: 'idle', reading: null, signalLevel: 0 }
 type Feedback = 'neutral' | 'correct' | 'wrong'
-type View = 'practice' | 'tuner'
+
+interface ToolsContextValue {
+  snapshot: AudioSnapshot
+  mode: PracticeMode
+  target: ExerciseTarget
+  feedback: Feedback
+  listening: boolean
+  selectMode: (mode: PracticeMode) => void
+  toggleMicrophone: () => Promise<void>
+}
+
+const ToolsContext = createContext<ToolsContextValue | null>(null)
+
+function useTools() {
+  const context = useContext(ToolsContext)
+  if (!context) throw new Error('Tool routes must be rendered inside the app shell')
+  return context
+}
 
 function savedMode(): PracticeMode {
   return localStorage.getItem('bass-note-finder-mode') === 'staff' ? 'staff' : 'note'
 }
 
-function App() {
+function AppShell() {
   const [snapshot, setSnapshot] = useState(initialSnapshot)
   const [mode, setMode] = useState<PracticeMode>(savedMode)
   const [target, setTarget] = useState<ExerciseTarget>(() => randomTarget(savedMode()))
   const [feedback, setFeedback] = useState<Feedback>('neutral')
-  const [view, setView] = useState<View>('practice')
   const analyzer = useRef<BassMicrophoneAnalyzer | null>(null)
   const advanceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const ignoredHeldMidi = useRef<number | null>(null)
   const listening = snapshot.state === 'listening'
   const playedNote = snapshot.reading ? frequencyToNote(snapshot.reading.frequency) : null
+  const pathname = useRouterState({ select: (state) => state.location.pathname })
+  const isPractice = pathname === '/'
+  const isMetronome = pathname === '/metronome'
 
   useEffect(() => () => {
     analyzer.current?.stop()
@@ -35,7 +64,7 @@ function App() {
   }, [])
 
   useEffect(() => {
-    if (view !== 'practice' || !snapshot.reading?.stable || !playedNote || feedback === 'correct') return
+    if (!isPractice || !snapshot.reading?.stable || !playedNote || feedback === 'correct') return
 
     if (ignoredHeldMidi.current !== null) {
       if (playedNote.midi === ignoredHeldMidi.current) return
@@ -52,11 +81,19 @@ function App() {
     } else {
       setFeedback('wrong')
     }
-  }, [snapshot.reading?.stable, snapshot.reading?.frequency, playedNote?.midi, target, mode, feedback, view])
+  }, [snapshot.reading?.stable, snapshot.reading?.frequency, playedNote?.midi, target, mode, feedback, isPractice])
 
   useEffect(() => {
     if (!snapshot.reading?.stable) setFeedback((current) => current === 'correct' ? current : 'neutral')
   }, [snapshot.reading?.stable])
+
+  useEffect(() => {
+    setFeedback('neutral')
+    if (isMetronome && analyzer.current) {
+      analyzer.current.stop()
+      analyzer.current = null
+    }
+  }, [pathname, isMetronome])
 
   const toggleMicrophone = async () => {
     if (listening || snapshot.state === 'requesting') {
@@ -88,38 +125,68 @@ function App() {
   return (
     <main className={`app feedback-${feedback}`}>
       <header className="app-header">
-        <a className="brand" href="#practice" onClick={() => setView('practice')}>Bass Note Finder</a>
-        {view === 'practice' && <ModeSwitch mode={mode} onChange={selectMode} />}
-        <span className={`listening-state ${listening ? 'active' : ''}`}>
+        <Link className="brand" to="/">Bass Tools</Link>
+        <nav className="tool-tabs" aria-label="Tools">
+          <Link to="/" activeOptions={{ exact: true }} activeProps={{ className: 'selected' }}>Note Finder</Link>
+          <Link to="/tuner" activeProps={{ className: 'selected' }}>Tuner</Link>
+          <Link to="/metronome" activeProps={{ className: 'selected' }}>Metronome</Link>
+        </nav>
+        <span className={`listening-state ${listening ? 'active' : ''} ${isMetronome ? 'placeholder' : ''}`}>
           <i />{statusLabel}
         </span>
       </header>
 
-      {view === 'practice' ? (
-        <section className="practice" id="practice" aria-live="polite">
-          <p className="eyebrow">PLAY THIS {mode === 'staff' ? 'PITCH' : 'NOTE'}</p>
-          <div className="prompt-frame">
-            {mode === 'note' ? <NotePrompt target={target} /> : <BassStaff target={target} />}
-          </div>
-          <FeedbackMessage feedback={feedback} listening={listening} />
-          <MicrophoneControl snapshot={snapshot} onToggle={toggleMicrophone} />
-        </section>
-      ) : (
-        <Tuner snapshot={snapshot} onToggle={toggleMicrophone} />
-      )}
+      <ToolsContext.Provider value={{ snapshot, mode, target, feedback, listening, selectMode, toggleMicrophone }}>
+        <div className="route-stage"><Outlet /></div>
+      </ToolsContext.Provider>
 
       {snapshot.error && <p className="error" role="alert">{snapshot.error}</p>}
 
-      <footer>
-        {view === 'practice' ? (
-          <button className="text-link" type="button" onClick={() => { setFeedback('neutral'); setView('tuner') }}>Need to tune? Open tuner</button>
-        ) : (
-          <button className="text-link" type="button" onClick={() => setView('practice')}>← Back to practice</button>
-        )}
+      {isPractice && <footer className="instrument-footer">
         <span>Standard 5-string · B–E–A–D–G</span>
-      </footer>
+      </footer>}
     </main>
   )
+}
+
+function PracticeRoute() {
+  const { mode, target, feedback, listening, selectMode, snapshot, toggleMicrophone } = useTools()
+
+  return <section className="practice" id="practice" aria-live="polite">
+    <ModeSwitch mode={mode} onChange={selectMode} />
+    <p className="eyebrow">PLAY THIS {mode === 'staff' ? 'PITCH' : 'NOTE'}</p>
+    <div className="prompt-frame">
+      {mode === 'note' ? <NotePrompt target={target} /> : <BassStaff target={target} />}
+    </div>
+    <FeedbackMessage feedback={feedback} listening={listening} />
+    <MicrophoneControl snapshot={snapshot} onToggle={toggleMicrophone} />
+  </section>
+}
+
+function TunerRoute() {
+  const { snapshot, toggleMicrophone } = useTools()
+  return <Tuner snapshot={snapshot} onToggle={toggleMicrophone} />
+}
+
+const rootRoute = createRootRoute({ component: AppShell })
+const practiceRoute = createRoute({ getParentRoute: () => rootRoute, path: '/', component: PracticeRoute })
+const tunerRoute = createRoute({ getParentRoute: () => rootRoute, path: '/tuner', component: TunerRoute })
+const metronomeRoute = createRoute({ getParentRoute: () => rootRoute, path: '/metronome', component: Metronome })
+const routeTree = rootRoute.addChildren([practiceRoute, tunerRoute, metronomeRoute])
+
+export function createAppRouter() {
+  return createRouter({ routeTree })
+}
+
+type AppRouter = ReturnType<typeof createAppRouter>
+
+declare module '@tanstack/react-router' {
+  interface Register { router: AppRouter }
+}
+
+function App() {
+  const [router] = useState(createAppRouter)
+  return <RouterProvider router={router} />
 }
 
 function ModeSwitch({ mode, onChange }: { mode: PracticeMode; onChange: (mode: PracticeMode) => void }) {
@@ -198,7 +265,7 @@ function Tuner({ snapshot, onToggle }: { snapshot: AudioSnapshot; onToggle: () =
   const cents = note ? Math.round(note.cents) : 0
   const meterPosition = Math.max(0, Math.min(100, 50 + cents))
 
-  return <section className={`tuner ${stable ? 'is-stable' : ''}`} aria-live="polite">
+  return <section className={`tool-panel tuner ${stable ? 'is-stable' : ''}`} aria-live="polite">
     <div className="tuner-heading"><span>TUNER</span><small>{stable ? 'Note locked' : 'Play a note'}</small></div>
     <div className="note-display">
       <span className="note-name">{stable && note ? note.note : '—'}</span>

@@ -1,11 +1,17 @@
 # Bass Note Finder
 
-A hands-free note-reading trainer for a standard five-string bass in B–E–A–D–G tuning. It supports two endless practice modes:
+A small collection of bass practice tools for a standard five-string bass in B–E–A–D–G tuning. Note Finder supports two endless practice modes:
 
 - **Note name:** play the requested pitch class in any octave.
 - **Bass clef:** play the exact written pitch from B0 through G3 (the instrument's first 12 frets). Notation follows the standard electric-bass convention and is written one octave above sounding pitch.
 
-Stable correct notes briefly turn the screen green and advance automatically. Stable wrong notes produce red feedback. Sharps and flats are mixed throughout the exercises. The original diagnostic tuner remains available from the page footer.
+Stable correct notes briefly turn the screen green and advance automatically. Stable wrong notes produce red feedback. Sharps and flats are mixed throughout the exercises.
+
+The app has three tool tabs:
+
+- **Note Finder:** the pitch-recognition exercise described above.
+- **Tuner:** frequency and cents feedback using the same microphone analyzer.
+- **Metronome:** a Web Audio clock with 30–240 BPM, 2–6 beats per bar, first-beat accent, volume control, and four synthesized sound choices. Woodblock is the default; the drum-kit sound combines alternating kick/snare beats with hi-hat subdivisions. Quarter, eighth, and sixteenth-note subdivisions are supported. Its step-based scheduler is the timing foundation for a future interactive beat ruler.
 
 Bass-clef notation is engraved in SVG with VexFlow's Bravura music font and loaded only when that exercise mode is opened.
 

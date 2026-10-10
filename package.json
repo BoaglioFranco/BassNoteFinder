@@ -10,6 +10,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@tanstack/react-router": "^1.170.42",
     "@vitejs/plugin-react": "latest",
     "react": "latest",
     "react-dom": "latest",
