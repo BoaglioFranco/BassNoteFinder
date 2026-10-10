@@ -14,6 +14,7 @@
     "@vitejs/plugin-react": "latest",
     "react": "latest",
     "react-dom": "latest",
+    "tone": "15.1.22",
     "typescript": "latest",
     "vexflow": "^5.0.0",
     "vite": "latest"

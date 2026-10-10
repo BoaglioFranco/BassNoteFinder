@@ -293,6 +293,13 @@ footer {
   text-align: center;
 }
 
+.route-loading {
+  margin: 80px auto;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+}
+
 .tool-panel {
   width: min(820px, 100%);
   margin: clamp(40px, 7vh, 72px) auto;

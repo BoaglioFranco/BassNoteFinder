@@ -5,6 +5,7 @@ import {
   type MetronomeSettings,
   type Subdivision,
 } from './audio/metronome'
+import { GRID_STEPS_PER_BEAT } from './rhythm/pattern'
 
 const DEFAULT_SETTINGS: MetronomeSettings = {
   bpm: 80,
@@ -16,8 +17,8 @@ const DEFAULT_SETTINGS: MetronomeSettings = {
 }
 
 const SOUNDS: ReadonlyArray<[MetronomeSound, string]> = [
-  ['click', 'Electronic click'],
   ['woodblock', 'Woodblock'],
+  ['click', 'Electronic click'],
   ['drums', 'Drum kit'],
   ['hihat', 'Hi-hat'],
 ]
@@ -48,15 +49,26 @@ function savedSettings(): MetronomeSettings {
 export default function Metronome() {
   const [settings, setSettings] = useState(savedSettings)
   const [running, setRunning] = useState(false)
+  const [starting, setStarting] = useState(false)
+  const [audioError, setAudioError] = useState<string | null>(null)
   const [activeStep, setActiveStep] = useState<number | null>(null)
   const engine = useRef<MetronomeEngine | null>(null)
+  const settingsRef = useRef(settings)
+  const mounted = useRef(true)
 
   useEffect(() => {
+    settingsRef.current = settings
     localStorage.setItem('bass-metronome-settings', JSON.stringify({ ...settings, soundVersion: 2 }))
     engine.current?.update(settings)
   }, [settings])
 
-  useEffect(() => () => { void engine.current?.dispose() }, [])
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+      engine.current?.dispose()
+    }
+  }, [])
 
   const toggle = async () => {
     if (running) {
@@ -65,10 +77,22 @@ export default function Metronome() {
       setActiveStep(null)
       return
     }
-    engine.current ??= new MetronomeEngine(settings, (tick) => setActiveStep(tick.step))
+    setStarting(true)
+    setAudioError(null)
+    engine.current ??= new MetronomeEngine(settings, (tick) => {
+      const spacing = GRID_STEPS_PER_BEAT / settingsRef.current.subdivision
+      if (tick.gridStep % spacing === 0) setActiveStep(tick.gridStep / spacing)
+    })
     engine.current.update(settings)
-    await engine.current.start()
-    setRunning(true)
+    try {
+      const started = await engine.current.start()
+      if (mounted.current && started) setRunning(true)
+    } catch {
+      engine.current.stop()
+      if (mounted.current) setAudioError('Could not start the audio engine. Reload the page and try again.')
+    } finally {
+      if (mounted.current) setStarting(false)
+    }
   }
 
   const adjustBpm = (amount: number) => {
@@ -80,7 +104,7 @@ export default function Metronome() {
   return <section className="tool-panel metronome" aria-label="Metronome">
     <div className="tool-heading">
       <span>METRONOME</span>
-      <small>{running ? 'Playing' : 'Ready'}</small>
+      <small>{starting ? 'Loading sounds' : running ? 'Playing' : 'Ready'}</small>
     </div>
 
     <div className="tempo-control">
@@ -148,7 +172,8 @@ export default function Metronome() {
       </label>
     </div>
 
-    <button className="primary-button metronome-start" type="button" onClick={() => void toggle()}>{running ? 'Stop' : 'Start'}</button>
+    {audioError && <p className="error" role="alert">{audioError}</p>}
+    <button className="primary-button metronome-start" type="button" disabled={starting} onClick={() => void toggle()}>{starting ? 'Loading…' : running ? 'Stop' : 'Start'}</button>
     <p className="keyboard-hint">30–240 BPM · settings are saved automatically</p>
   </section>
 }

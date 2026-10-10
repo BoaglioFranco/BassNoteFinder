@@ -11,7 +11,7 @@ The app has three tool tabs:
 
 - **Note Finder:** the pitch-recognition exercise described above.
 - **Tuner:** frequency and cents feedback using the same microphone analyzer.
-- **Metronome:** a Web Audio clock with 30–240 BPM, 2–6 beats per bar, first-beat accent, volume control, and four synthesized sound choices. Woodblock is the default; the drum-kit sound combines alternating kick/snare beats with hi-hat subdivisions. Quarter, eighth, and sixteenth-note subdivisions are supported. Its step-based scheduler is the timing foundation for a future interactive beat ruler.
+- **Metronome:** a Tone.js-backed musical transport with 30–240 BPM, 2–6 beats per bar, first-beat accent, volume control, and four sound choices. Woodblock is the default; the drum-kit sound uses recorded acoustic kick, snare, and hi-hat samples. Quarter, eighth, and sixteenth-note subdivisions are supported.
 
 Bass-clef notation is engraved in SVG with VexFlow's Bravura music font and loaded only when that exercise mode is opened.
 
@@ -77,11 +77,33 @@ Bass Clef renderer
 Tuner
   → reuses the same AudioSnapshot
   → displays the detected note, frequency, and cents offset
+
+Metronome UI
+  → stores user settings in localStorage
+  → creates a library-neutral RhythmPattern on a sixteenth-note grid
+  → sends settings and lifecycle commands to MetronomeEngine
+
+MetronomeEngine
+  → validates patterns independently of the audio library
+  → commits rhythm edits together on the next downbeat
+  → delegates timing, tempo, and draw synchronization to Tone.js
+
+ToneRhythmAudio
+  → schedules against Tone.Transport's audio clock
+  → routes every sound through one master gain
+  → reuses decoded acoustic drum samples with round-robin variations
+  → aligns React visuals through Tone.getDraw()
 ```
 
 The main orchestration and UI live in `src/App.tsx`. Target generation and matching live in `src/exercise.ts`. Microphone capture, pitch detection, and stability tracking live under `src/audio/`.
 
+Rhythms are plain data in `src/rhythm/pattern.ts`: every event has an attack step and duration measured on a canonical sixteenth-note grid. `src/audio/metronome.ts` adapts that model to an injected audio port, while `src/audio/toneAdapter.ts` is the only Tone.js-specific layer. This separation is intended to let the beat ruler add rests, attacks, and note-length bars without coupling saved exercises to Tone.js.
+
+Tone.js is pinned to the stable 15.1.22 release. The metronome route is lazy-loaded so its audio framework does not increase the Note Finder's initial JavaScript bundle.
+
 ## Audio notes
+
+The acoustic drum files under `public/audio/drums/` come from the CC0 Virtuosity Drums library. Their provenance is recorded alongside the files in `public/audio/drums/LICENSE.md`.
 
 Microphone processing stays in the browser. Capture requests echo cancellation, noise suppression, and automatic gain control off. Browser and operating-system audio processing may still vary by device.
 

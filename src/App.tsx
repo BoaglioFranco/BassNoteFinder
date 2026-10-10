@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createContext, lazy, Suspense, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import {
   createRootRoute,
   createRoute,
@@ -16,8 +16,9 @@ import {
   type ExerciseTarget,
   type PracticeMode,
 } from './exercise'
-import Metronome from './Metronome'
 import './styles.css'
+
+const Metronome = lazy(() => import('./Metronome'))
 
 const initialSnapshot: AudioSnapshot = { state: 'idle', reading: null, signalLevel: 0 }
 type Feedback = 'neutral' | 'correct' | 'wrong'
@@ -171,7 +172,11 @@ function TunerRoute() {
 const rootRoute = createRootRoute({ component: AppShell })
 const practiceRoute = createRoute({ getParentRoute: () => rootRoute, path: '/', component: PracticeRoute })
 const tunerRoute = createRoute({ getParentRoute: () => rootRoute, path: '/tuner', component: TunerRoute })
-const metronomeRoute = createRoute({ getParentRoute: () => rootRoute, path: '/metronome', component: Metronome })
+const metronomeRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/metronome',
+  component: () => <Suspense fallback={<p className="route-loading">Loading metronome…</p>}><Metronome /></Suspense>,
+})
 const routeTree = rootRoute.addChildren([practiceRoute, tunerRoute, metronomeRoute])
 
 export function createAppRouter() {
