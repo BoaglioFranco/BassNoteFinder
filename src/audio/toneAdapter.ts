@@ -65,7 +65,10 @@ export class ToneRhythmAudio implements RhythmAudioPort {
       }
       this.prepared = true
     }
-    await Tone.loaded()
+    // A single sample that Safari cannot decode must not prevent the synth
+    // voices (or any samples that did load) from starting. Sample-backed
+    // voices fall back to the synth banks in trigger().
+    await Tone.loaded().catch(() => undefined)
   }
 
   setBpm(bpm: number) {
@@ -123,13 +126,24 @@ export class ToneRhythmAudio implements RhythmAudioPort {
       const pitch = event.emphasis === 'downbeat' ? 'D6' : event.emphasis === 'beat' ? 'B5' : 'G5'
       this.pulseSynths?.woodblock.triggerAttackRelease(pitch, duration, audioTime, event.velocity)
     } else if (event.voice === 'bass' || event.voice === 'pickedBass') {
-      this.bassSamples?.[event.voice].triggerAttackRelease('E1', duration, audioTime, event.velocity)
+      const sampler = this.bassSamples?.[event.voice]
+      if (sampler?.loaded) {
+        sampler.triggerAttackRelease('E1', duration, audioTime, event.velocity)
+      } else {
+        this.cueSynths?.synthBass.triggerAttackRelease('E1', duration, audioTime, event.velocity)
+      }
     } else if (event.voice === 'synthBass') {
       this.cueSynths?.synthBass.triggerAttackRelease('E1', duration, audioTime, event.velocity)
     } else if (event.voice === 'kick' || event.voice === 'snare' || event.voice === 'hihat') {
       const pool = this.drums?.[event.voice]
       const variant = this.roundRobin[event.voice]++ % 2
-      pool?.[variant].triggerAttack('C1', audioTime, event.velocity)
+      const sampler = pool?.[variant]
+      if (sampler?.loaded) {
+        sampler.triggerAttack('C1', audioTime, event.velocity)
+      } else {
+        const fallbackPitch = event.voice === 'kick' ? 'E2' : event.voice === 'snare' ? 'C5' : 'G6'
+        this.pulseSynths?.click.triggerAttackRelease(fallbackPitch, duration, audioTime, event.velocity)
+      }
     }
   }
 

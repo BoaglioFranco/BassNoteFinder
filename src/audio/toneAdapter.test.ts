@@ -3,7 +3,7 @@ import type { RhythmEvent } from '../rhythm/pattern'
 
 const mocks = vi.hoisted(() => {
   const polySynths: Array<{ options: Record<string, unknown>, triggerAttackRelease: ReturnType<typeof vi.fn> }> = []
-  const samplers: Array<{ options: Record<string, unknown>, triggerAttack: ReturnType<typeof vi.fn>, triggerAttackRelease: ReturnType<typeof vi.fn> }> = []
+  const samplers: Array<{ loaded: boolean, options: Record<string, unknown>, triggerAttack: ReturnType<typeof vi.fn>, triggerAttackRelease: ReturnType<typeof vi.fn> }> = []
   const transport = {
     bpm: { value: 120 }, timeSignature: 4, position: 0 as string | number,
     scheduleRepeat: vi.fn(() => 9), clear: vi.fn(), start: vi.fn(), stop: vi.fn(),
@@ -37,6 +37,7 @@ vi.mock('tone', () => ({
     dispose() { mocks.polyDispose() }
   },
   Sampler: class {
+    loaded = true
     triggerAttack = vi.fn()
     triggerAttackRelease = vi.fn()
     options: Record<string, unknown>
@@ -71,6 +72,19 @@ describe('ToneRhythmAudio', () => {
     expect(mocks.loaded).toHaveBeenCalledTimes(2)
     expect(mocks.polySynths).toHaveLength(3)
     expect(mocks.samplers).toHaveLength(8)
+  })
+
+  it('starts with synth fallbacks when Safari rejects a sample decode', async () => {
+    mocks.loaded.mockRejectedValueOnce(new Error('Safari could not decode a sample'))
+    const audio = new ToneRhythmAudio()
+
+    await expect(audio.prepare()).resolves.toBeUndefined()
+    mocks.samplers.forEach((sampler) => { sampler.loaded = false })
+    audio.trigger(event('kick'), 2, 48)
+    audio.trigger(event('bass'), 2, 48)
+
+    expect(mocks.polySynths[0].triggerAttackRelease).toHaveBeenCalledWith('E2', '48i', 2, 0.8)
+    expect(mocks.polySynths[2].triggerAttackRelease).toHaveBeenCalledWith('E1', '48i', 2, 0.8)
   })
 
   it('delegates musical scheduling and draw synchronization to Tone', () => {
