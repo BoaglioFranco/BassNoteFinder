@@ -117,7 +117,7 @@ button, input, select { font: inherit; }
 .ruler-bar-labels span { padding: 9px 10px; flex: 1; border-bottom: 1px solid var(--mantine-color-gray-2); color: var(--mantine-color-dimmed); font-size: 9px; font-weight: 700; letter-spacing: .1em; text-align: left; }
 .ruler-bar-labels span + span { border-left: 3px solid var(--mantine-color-gray-6); }
 .ruler-notes { position: absolute; inset: 0; pointer-events: none; }
-.ruler-note { height: 38px; position: absolute; z-index: 3; top: 66px; display: flex; align-items: center; border-radius: 999px; background: var(--mantine-primary-color-filled); box-shadow: 0 4px 10px rgb(0 0 0 / 16%); color: white; pointer-events: auto; }
+.ruler-note { height: 38px; position: absolute; z-index: 3; top: 66px; display: flex; align-items: center; border-radius: 999px; background: var(--mantine-primary-color-filled); box-shadow: 0 4px 10px rgb(0 0 0 / 16%); color: white; pointer-events: auto; touch-action: none; }
 .beat-ruler-track.edit .ruler-note { cursor: grab; }
 .beat-ruler-track.edit .ruler-note:active { cursor: grabbing; }
 .ruler-note b { width: 27px; height: 27px; margin-left: 5px; display: grid; place-items: center; border-radius: 50%; background: rgb(255 255 255 / 17%); font-size: 16px; font-weight: 500; }

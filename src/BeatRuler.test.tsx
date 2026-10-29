@@ -87,6 +87,46 @@ describe('Beat Ruler UI', () => {
     expect(screen.queryByTestId('ruler-note-note-15')).toBeNull()
   })
 
+  it('removes a note with a touch long press', () => {
+    vi.useFakeTimers()
+    try {
+      render(<BeatRuler />)
+      const track = screen.getByTestId('beat-ruler-track')
+      vi.spyOn(track, 'getBoundingClientRect').mockReturnValue({
+        x: 0, y: 0, left: 0, top: 0, right: 160, bottom: 180, width: 160, height: 180, toJSON: () => ({}),
+      })
+      const note = screen.getByTestId('ruler-note-note-0')
+
+      fireEvent.pointerDown(note, { button: 0, pointerId: 9, pointerType: 'touch', clientX: 10, clientY: 80 })
+      act(() => vi.advanceTimersByTime(550))
+
+      expect(note.isConnected).toBe(false)
+      expect(screen.queryByTestId('ruler-note-note-0')).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('keeps a touch note when the long press turns into a drag', () => {
+    vi.useFakeTimers()
+    try {
+      render(<BeatRuler />)
+      const track = screen.getByTestId('beat-ruler-track')
+      vi.spyOn(track, 'getBoundingClientRect').mockReturnValue({
+        x: 0, y: 0, left: 0, top: 0, right: 160, bottom: 180, width: 160, height: 180, toJSON: () => ({}),
+      })
+      const note = screen.getByTestId('ruler-note-note-0')
+
+      fireEvent.pointerDown(note, { button: 0, pointerId: 10, pointerType: 'touch', clientX: 10, clientY: 80 })
+      fireEvent.pointerMove(track, { pointerId: 10, pointerType: 'touch', clientX: 30, clientY: 80 })
+      act(() => vi.advanceTimersByTime(550))
+
+      expect(screen.getByTestId('ruler-note-note-0')).toBeTruthy()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('uses the grid control to toggle eighth and sixteenth subdivisions', () => {
     render(<BeatRuler />)
 

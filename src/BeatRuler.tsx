@@ -123,6 +123,7 @@ export default function BeatRuler() {
   const engine = useRef<BeatRulerEngine | null>(null)
   const mounted = useRef(true)
   const drag = useRef<null | { kind: 'move' | 'resize', noteId: string, pointerOffsetSteps: number }>(null)
+  const longPress = useRef<null | { pointerId: number, startX: number, startY: number, timer: ReturnType<typeof setTimeout> }>(null)
   const nextId = useRef(notes.reduce((largest, note) => Math.max(largest, Number(note.id.split('-').pop()) || 0), 0) + 1)
   const stepsPerBar = totalStepsForBar(settings.beatsPerBar)
   const totalSteps = totalStepsForPattern(settings.beatsPerBar, settings.bars)
@@ -141,6 +142,11 @@ export default function BeatRuler() {
     }
   })
 
+  const cancelLongPress = () => {
+    if (longPress.current) clearTimeout(longPress.current.timer)
+    longPress.current = null
+  }
+
   useEffect(() => {
     localStorage.setItem('bass-beat-ruler', JSON.stringify({ version: 4, settings, snap, notes }))
     engine.current?.update(settings, notes)
@@ -150,6 +156,7 @@ export default function BeatRuler() {
     mounted.current = true
     return () => {
       mounted.current = false
+      cancelLongPress()
       engine.current?.dispose()
     }
   }, [])
@@ -246,12 +253,22 @@ export default function BeatRuler() {
         className={`beat-ruler-track ${mode}`}
         data-testid={row.rowIndex === 0 ? 'beat-ruler-track' : `beat-ruler-track-row-${row.rowIndex + 1}`}
         data-row-bars={row.bars}
-        onPointerMove={(event) => resizeFromPointer(event.clientX, event.currentTarget, row.startStep, row.steps)}
+        onPointerMove={(event) => {
+          const pending = longPress.current
+          if (pending?.pointerId === event.pointerId && Math.hypot(event.clientX - pending.startX, event.clientY - pending.startY) > 8) {
+            cancelLongPress()
+          }
+          resizeFromPointer(event.clientX, event.currentTarget, row.startStep, row.steps)
+        }}
         onPointerUp={(event) => {
+          cancelLongPress()
           drag.current = null
           event.currentTarget.releasePointerCapture?.(event.pointerId)
         }}
-        onPointerCancel={() => { drag.current = null }}>
+        onPointerCancel={() => {
+          cancelLongPress()
+          drag.current = null
+        }}>
         <div className="ruler-grid">
           {visibleGridSteps.filter((step) => step >= row.startStep && step < row.startStep + row.steps).map((step) => <button
             key={step}
@@ -277,6 +294,8 @@ export default function BeatRuler() {
               className={`ruler-note ${includesAttack ? '' : 'continuation'} ${activeNoteId === note.id ? 'active' : ''}`}
               data-testid={includesAttack ? `ruler-note-${note.id}` : `ruler-note-${note.id}-continuation-${row.rowIndex}`}
               aria-label={`${includesAttack ? 'Note' : 'Continuation of note'} at ${stepLabel(note.startStep, settings.beatsPerBar, settings.bars)}, ${note.durationSteps} sixteenth-note steps`}
+              role={mode === 'edit' && includesAttack ? 'button' : undefined}
+              tabIndex={mode === 'edit' && includesAttack ? 0 : undefined}
               style={{ left: `${(fragmentStart - row.startStep) / row.steps * 100}%`, width: `${(fragmentEnd - fragmentStart) / row.steps * 100}%` } as CSSProperties}
               onPointerDown={(event) => {
                 if (mode !== 'edit' || event.button !== 0) return
@@ -286,6 +305,24 @@ export default function BeatRuler() {
                 const pointerStep = row.startStep + ((event.clientX - rect.left) / rect.width) * row.steps
                 drag.current = { kind: 'move', noteId: note.id, pointerOffsetSteps: pointerStep - note.startStep }
                 track.setPointerCapture?.(event.pointerId)
+                if (event.pointerType === 'touch' || event.pointerType === 'pen') {
+                  cancelLongPress()
+                  const pointerId = event.pointerId
+                  const startX = event.clientX
+                  const startY = event.clientY
+                  const timer = setTimeout(() => {
+                    if (longPress.current?.pointerId !== pointerId) return
+                    longPress.current = null
+                    drag.current = null
+                    setNotes((current) => removeBeatRulerNote(current, note.id))
+                  }, 550)
+                  longPress.current = { pointerId, startX, startY, timer }
+                }
+              }}
+              onKeyDown={(event) => {
+                if (mode !== 'edit' || !includesAttack || (event.key !== 'Delete' && event.key !== 'Backspace')) return
+                event.preventDefault()
+                setNotes((current) => removeBeatRulerNote(current, note.id))
               }}
               onContextMenu={(event) => {
                 event.preventDefault()
@@ -309,7 +346,7 @@ export default function BeatRuler() {
       </div>)}
     </div>
 
-    <Text className="ruler-help" c="dimmed" size="xs">Click to add · drag a note to move · drag its right edge to resize · right-click to delete</Text>
+    <Text className="ruler-help" c="dimmed" size="xs">Tap to add · drag a note to move · drag its right edge to resize · press and hold to delete</Text>
 
     <div className="ruler-options">
       <section className={`ruler-settings-section ruler-edit-settings ${mode === 'playback' ? 'is-locked' : ''}`} aria-label="Rhythm settings">
