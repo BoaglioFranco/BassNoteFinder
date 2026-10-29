@@ -12,12 +12,14 @@ import {
   Alert,
   AppShell as MantineAppShell,
   Badge,
+  Box,
   Button,
   Center,
   Container,
   Group,
   Loader,
   Paper,
+  SimpleGrid,
   Stack,
   Text,
   UnstyledButton,
@@ -25,6 +27,7 @@ import {
 import { Activity, AudioLines, CircleGauge, Mic, Music2, Square, Timer } from 'lucide-react'
 import { BassMicrophoneAnalyzer, type AudioSnapshot } from './audio/microphone'
 import { frequencyToNote } from './audio/pitch'
+import { ToolPanelHeader } from './ToolPanelHeader'
 import {
   randomTarget,
   targetMatches,
@@ -157,7 +160,7 @@ function ToolShell() {
     denied: 'Permission blocked', unavailable: 'Microphone unavailable', error: 'Audio error',
   }[snapshot.state]
 
-  return <MantineAppShell className={`app feedback-${feedback}`} header={{ height: { base: 116, sm: 72 } }}>
+  return <MantineAppShell className={`app feedback-${feedback}`} mih="100vh" bg="myColor.0" header={{ height: { base: 116, sm: 72 } }}>
     <MantineAppShell.Header className="app-header" withBorder={false}>
       <Container size="lg" h="100%" px={{ base: 'sm', sm: 'md' }}>
         <Group className="header-row" h={{ base: 62, sm: '100%' }} justify="space-between" wrap="nowrap">
@@ -179,7 +182,12 @@ function ToolShell() {
       </Container>
     </MantineAppShell.Header>
 
-    <MantineAppShell.Main className="route-stage">
+    <MantineAppShell.Main
+      pos="relative"
+      mih="100dvh"
+      pt={{ base: 'calc(var(--app-shell-header-offset, 116px) + 14px)', sm: 'calc(var(--app-shell-header-offset, 72px) + 28px)' }}
+      pb={{ base: 30, sm: 48 }}
+    >
       <ToolsContext.Provider value={{ snapshot, mode, target, feedback, listening, stringCount, selectMode, selectStringCount, toggleMicrophone }}>
         <Outlet />
       </ToolsContext.Provider>
@@ -197,18 +205,23 @@ function ToolLink({ to, exact, icon, children }: { to: '/' | '/tuner' | '/metron
 function PracticeRoute() {
   const { mode, target, feedback, listening, stringCount, selectMode, selectStringCount, snapshot, toggleMicrophone } = useTools()
 
-  return <Container size="sm" className="practice" id="practice" aria-live="polite">
-    <Paper className="practice-card" withBorder p={{ base: 'lg', sm: 36 }}>
-    <div className="practice-controls">
-      <ModeSwitch mode={mode} onChange={selectMode} />
-      <InstrumentSwitch stringCount={stringCount} onChange={selectStringCount} />
-    </div>
-    <Text className="eyebrow">PLAY THIS {mode === 'staff' ? 'PITCH' : 'NOTE'}</Text>
-    <div className="prompt-frame">
-      {mode === 'note' ? <NotePrompt target={target} /> : <BassStaff target={target} />}
-    </div>
-    <FeedbackMessage feedback={feedback} listening={listening} />
-    <MicrophoneControl snapshot={snapshot} onToggle={toggleMicrophone} />
+  return <Container size="sm" w="100%" px={{ base: 'sm', sm: 'md' }} id="practice" aria-live="polite">
+    <Paper component="section" withBorder shadow="xs" bg="white" ta="center" style={{ overflow: 'hidden' }} aria-label="Note Finder">
+      <ToolPanelHeader title="NOTE FINDER" />
+      <Stack px={{ base: 'md', sm: 'xl' }} py={{ base: 'lg', sm: 'xl' }} gap={0} align="center">
+        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing={{ base: 'sm', sm: 'xl' }} w="100%">
+          <ModeSwitch mode={mode} onChange={selectMode} />
+          <InstrumentSwitch stringCount={stringCount} onChange={selectStringCount} />
+        </SimpleGrid>
+        <Text mt={{ base: 38, sm: 48 }} c="dimmed" fz={10} fw={750} lts=".15em">
+          PLAY THIS {mode === 'staff' ? 'PITCH' : 'NOTE'}
+        </Text>
+        <Center h={{ base: 205, sm: 220 }} w="100%">
+          {mode === 'note' ? <NotePrompt target={target} /> : <BassStaff target={target} />}
+        </Center>
+        <FeedbackMessage feedback={feedback} listening={listening} />
+        <MicrophoneControl snapshot={snapshot} onToggle={toggleMicrophone} />
+      </Stack>
     </Paper>
   </Container>
 }
@@ -249,28 +262,31 @@ function App() {
 }
 
 function ModeSwitch({ mode, onChange }: { mode: PracticeMode; onChange: (mode: PracticeMode) => void }) {
-  return <Button.Group aria-label="Exercise mode">
-    <Button variant={mode === 'note' ? 'filled' : 'default'} className={mode === 'note' ? 'selected' : ''} onClick={() => onChange('note')}>Note name</Button>
-    <Button variant={mode === 'staff' ? 'filled' : 'default'} className={mode === 'staff' ? 'selected' : ''} onClick={() => onChange('staff')}>Bass clef</Button>
-  </Button.Group>
+  return <Stack gap={5} align="stretch">
+    <Text size="xs" c="dimmed" fw={700} ta="left">MODE</Text>
+    <Button.Group w="100%" aria-label="Exercise mode">
+      <Button size="sm" flex={1} variant={mode === 'note' ? 'filled' : 'default'} className={mode === 'note' ? 'selected' : ''} onClick={() => onChange('note')}>Note name</Button>
+      <Button size="sm" flex={1} variant={mode === 'staff' ? 'filled' : 'default'} className={mode === 'staff' ? 'selected' : ''} onClick={() => onChange('staff')}>Bass clef</Button>
+    </Button.Group>
+  </Stack>
 }
 
 function InstrumentSwitch({ stringCount, onChange }: { stringCount: BassStringCount; onChange: (stringCount: BassStringCount) => void }) {
-  return <Stack gap={5} className="instrument-switch">
-    <Text size="xs" c="dimmed" fw={700}>STANDARD</Text>
-    <Button.Group aria-label="Bass configuration">
-      <Button size="sm" variant={stringCount === 4 ? 'filled' : 'default'} className={stringCount === 4 ? 'selected' : ''} onClick={() => onChange(4)}>4 string</Button>
-      <Button size="sm" variant={stringCount === 5 ? 'filled' : 'default'} className={stringCount === 5 ? 'selected' : ''} onClick={() => onChange(5)}>5 string</Button>
+  return <Stack gap={5} align="stretch">
+    <Text size="xs" c="dimmed" fw={700} ta="left">STANDARD</Text>
+    <Button.Group w="100%" aria-label="Bass configuration">
+      <Button size="sm" flex={1} variant={stringCount === 4 ? 'filled' : 'default'} className={stringCount === 4 ? 'selected' : ''} onClick={() => onChange(4)}>4 string</Button>
+      <Button size="sm" flex={1} variant={stringCount === 5 ? 'filled' : 'default'} className={stringCount === 5 ? 'selected' : ''} onClick={() => onChange(5)}>5 string</Button>
     </Button.Group>
   </Stack>
 }
 
 function NotePrompt({ target }: { target: ExerciseTarget }) {
   const accidental = target.name.slice(1)
-  return <div className="letter-prompt" aria-label={`Play ${target.name}`}>
-    <div className="letter-name"><span>{target.letter}</span>{accidental && <sup>{accidental}</sup>}</div>
-    <small>{target.spanishName}</small>
-  </div>
+  return <Stack align="center" gap="md" lh={1} aria-label={`Play ${target.name}`}>
+    <Box className="letter-name"><span>{target.letter}</span>{accidental && <sup>{accidental}</sup>}</Box>
+    <Text c="dimmed" fz="xs" fw={700} lts=".13em" tt="uppercase">{target.spanishName}</Text>
+  </Stack>
 }
 
 function BassStaff({ target }: { target: ExerciseTarget }) {
@@ -318,7 +334,8 @@ function BassStaff({ target }: { target: ExerciseTarget }) {
 
 function FeedbackMessage({ feedback, listening }: { feedback: Feedback; listening: boolean }) {
   const message = feedback === 'correct' ? 'That’s it' : feedback === 'wrong' ? 'Try another note' : listening ? 'Listening…' : 'Start the microphone when you’re ready'
-  return <Group className="feedback-message" gap="xs" justify="center" aria-live="assertive"><span className="status-dot" />{message}</Group>
+  const color = feedback === 'correct' ? 'green.7' : feedback === 'wrong' ? 'red.7' : 'dimmed'
+  return <Group mih={28} mt={6} mb="lg" gap="xs" justify="center" c={color} fz="sm" aria-live="assertive"><span className="status-dot" />{message}</Group>
 }
 
 function MicrophoneControl({ snapshot, onToggle, purpose = 'practice' }: { snapshot: AudioSnapshot; onToggle: () => void; purpose?: 'practice' | 'tuner' }) {
@@ -335,8 +352,8 @@ function Tuner({ snapshot, onToggle }: { snapshot: AudioSnapshot; onToggle: () =
   const cents = note ? Math.round(note.cents) : 0
   const meterPosition = Math.max(0, Math.min(100, 50 + cents))
 
-  return <Container size="sm" className="tool-container"><Paper component="section" className={`tool-panel tuner ${stable ? 'is-stable' : ''}`} withBorder aria-live="polite" aria-label="Tuner">
-    <Group className="tool-heading" justify="space-between"><Text fw={800}>TUNER</Text><Badge color={stable ? 'green' : 'gray'} variant="light">{stable ? 'Note locked' : 'Play a note'}</Badge></Group>
+  return <Container size="sm" w="100%" px={{ base: 'sm', sm: 'md' }}><Paper component="section" className={`tuner ${stable ? 'is-stable' : ''}`} withBorder shadow="xs" bg="white" style={{ overflow: 'hidden' }} aria-live="polite" aria-label="Tuner">
+    <ToolPanelHeader title="TUNER" status={<Badge color={stable ? 'green' : 'gray'} variant="light">{stable ? 'Note locked' : 'Play a note'}</Badge>} />
     <div className="note-display">
       <span className="note-name">{stable && note ? note.note : '—'}</span>
       <span className="octave">{stable && note ? `octave ${note.octave}` : 'WAITING FOR A STABLE NOTE'}</span>

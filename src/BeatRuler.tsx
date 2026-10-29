@@ -11,6 +11,7 @@ import {
   Paper,
   Text,
 } from '@mantine/core'
+import { useMediaQuery } from '@mantine/hooks'
 import { LockKeyhole, Pencil, Play, Square } from 'lucide-react'
 import {
   BeatRulerEngine,
@@ -32,6 +33,7 @@ import {
   type BeatRulerSnap,
 } from './rhythm/beatRuler'
 import { GRID_STEPS_PER_BEAT, type MetronomeSound } from './rhythm/pattern'
+import { ToolPanelHeader } from './ToolPanelHeader'
 
 type RulerMode = 'edit' | 'playback'
 
@@ -107,6 +109,7 @@ function stepLabel(step: number, beatsPerBar: number, bars: number) {
 }
 
 export default function BeatRuler() {
+  const isCompactRuler = useMediaQuery('(max-width: 40.625em)')
   const [initial] = useState(loadDocument)
   const [settings, setSettings] = useState(initial.settings)
   const [snap, setSnap] = useState(initial.snap)
@@ -125,9 +128,10 @@ export default function BeatRuler() {
   const totalSteps = totalStepsForPattern(settings.beatsPerBar, settings.bars)
   const gridUnit = snapSize(snap)
   const visibleGridSteps = Array.from({ length: totalSteps / gridUnit }, (_, index) => index * gridUnit)
-  const rulerRows = Array.from({ length: Math.ceil(settings.bars / 2) }, (_, rowIndex) => {
-    const startBar = rowIndex * 2
-    const bars = Math.min(2, settings.bars - startBar)
+  const barsPerRow = isCompactRuler ? 1 : 2
+  const rulerRows = Array.from({ length: Math.ceil(settings.bars / barsPerRow) }, (_, rowIndex) => {
+    const startBar = rowIndex * barsPerRow
+    const bars = Math.min(barsPerRow, settings.bars - startBar)
     return {
       rowIndex,
       startBar,
@@ -222,22 +226,19 @@ export default function BeatRuler() {
     }
   }
 
-  return <Container size="lg" className="tool-container beat-ruler-container"><Paper component="section" className="tool-panel beat-ruler" withBorder aria-label="Beat Ruler">
-    <Group className="tool-heading" justify="space-between">
-      <Text fw={800}>BEAT RULER</Text>
-      <Badge color={running ? 'green' : mode === 'edit' ? 'myColor' : 'gray'} variant="light">
+  return <Container size="lg" w="100%" px={{ base: 'sm', sm: 'md' }}><Paper component="section" className="beat-ruler" withBorder shadow="xs" bg="white" style={{ overflow: 'hidden' }} aria-label="Beat Ruler">
+    <ToolPanelHeader title="BEAT RULER" status={<Badge color={running ? 'green' : mode === 'edit' ? 'myColor' : 'gray'} variant="light">
         {starting ? 'Loading sounds' : running ? 'Playing' : mode === 'edit' ? 'Editing' : 'Ready'}
-      </Badge>
-    </Group>
+      </Badge>} />
 
-    <div className="ruler-toolbar">
+    <Group className="ruler-toolbar" mih={76} px={{ base: 14, sm: 22 }} py={16} justify="space-between" align="flex-end" gap="md" wrap="nowrap">
       <Button.Group aria-label="Ruler mode">
         <Button type="button" leftSection={<Pencil size={15} />} variant={mode === 'edit' ? 'filled' : 'default'} className={mode === 'edit' ? 'selected' : ''} onClick={() => selectMode('edit')}>Edit</Button>
         <Button type="button" leftSection={<Play size={15} />} variant={mode === 'playback' ? 'filled' : 'default'} className={mode === 'playback' ? 'selected' : ''} onClick={() => selectMode('playback')}>Playback</Button>
       </Button.Group>
       <NumberInput className="compact-tempo" label="BPM" aria-label="Beat ruler tempo in BPM" role="spinbutton" min={30} max={240} value={settings.bpm}
         clampBehavior="strict" hideControls onChange={(value) => setSettings((current) => ({ ...current, bpm: Math.min(240, Math.max(30, Number(value) || 30)) }))} />
-    </div>
+    </Group>
 
     <div className="ruler-track-stack" data-total-bars={settings.bars}
       aria-label={`${settings.bars} ${settings.bars === 1 ? 'bar' : 'bars'}, ${settings.beatsPerBar} beats per bar, ${snap === 2 ? 'eighth' : 'sixteenth'}-note grid`}>
@@ -338,14 +339,20 @@ export default function BeatRuler() {
         <div className="ruler-playback-controls">
           <div className="ruler-sound-control">
             <Checkbox className="channel-toggle" aria-label="Sound metronome" label="On" checked={settings.metronomeEnabled}
-              onChange={(event) => setSettings((current) => ({ ...current, metronomeEnabled: event.currentTarget.checked }))} />
+              onChange={(event) => {
+                const metronomeEnabled = event.currentTarget.checked
+                setSettings((current) => ({ ...current, metronomeEnabled }))
+              }} />
             <NativeSelect label="METRONOME" id="ruler-metronome-sound" value={settings.metronomeSound} disabled={!settings.metronomeEnabled}
               onChange={(event) => setSettings((current) => ({ ...current, metronomeSound: event.target.value as MetronomeSound }))}
               data={METRONOME_SOUNDS.map(([value, label]) => ({ value, label }))} />
           </div>
           <div className="ruler-sound-control">
             <Checkbox className="channel-toggle" aria-label="Sound ruler notes" label="On" checked={settings.cueEnabled}
-              onChange={(event) => setSettings((current) => ({ ...current, cueEnabled: event.currentTarget.checked }))} />
+              onChange={(event) => {
+                const cueEnabled = event.currentTarget.checked
+                setSettings((current) => ({ ...current, cueEnabled }))
+              }} />
             <NativeSelect label="RULER CUE" id="ruler-cue-sound" value={settings.cueSound} disabled={!settings.cueEnabled}
               onChange={(event) => setSettings((current) => ({ ...current, cueSound: event.target.value as BeatRulerCueSound }))}
               data={CUE_SOUNDS.map(([value, label]) => ({ value, label }))} />

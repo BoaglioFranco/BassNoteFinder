@@ -128,6 +128,48 @@ describe('Beat Ruler UI', () => {
     expect(screen.getByLabelText('1 bar, 4 beats per bar, sixteenth-note grid')).toBeTruthy()
   })
 
+  it('renders one bar per row on narrow screens and keeps note resizing usable', () => {
+    const originalMatchMedia = window.matchMedia
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+      matches: query === '(max-width: 40.625em)',
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }))
+    localStorage.setItem('bass-beat-ruler', JSON.stringify({
+      version: 4,
+      settings: { ...DEFAULT_SAVED_SETTINGS, bars: 2, cueSound: 'bass' },
+      snap: 4,
+      notes: [{ id: 'mobile-note', startStep: 0, durationSteps: 4 }],
+    }))
+
+    try {
+      render(<BeatRuler />)
+      const firstBar = screen.getByTestId('beat-ruler-track')
+      const secondBar = screen.getByTestId('beat-ruler-track-row-2')
+      expect(firstBar.getAttribute('data-row-bars')).toBe('1')
+      expect(secondBar.getAttribute('data-row-bars')).toBe('1')
+      expect(firstBar.querySelectorAll('.ruler-bar-labels span')).toHaveLength(1)
+      expect(secondBar.querySelectorAll('.ruler-bar-labels span')).toHaveLength(1)
+
+      vi.spyOn(firstBar, 'getBoundingClientRect').mockReturnValue({
+        x: 0, y: 0, left: 0, top: 0, right: 320, bottom: 162, width: 320, height: 162, toJSON: () => ({}),
+      })
+      const handle = screen.getByRole('button', { name: 'Resize note at bar 1, beat 1' })
+      fireEvent.pointerDown(handle, { pointerId: 7, clientX: 80 })
+      fireEvent.pointerMove(firstBar, { pointerId: 7, clientX: 160 })
+      fireEvent.pointerUp(firstBar, { pointerId: 7, clientX: 160 })
+
+      expect(screen.getByTestId('ruler-note-mobile-note').getAttribute('aria-label')).toContain('8 sixteenth-note steps')
+    } finally {
+      window.matchMedia = originalMatchMedia
+    }
+  })
+
   it('removes off-grid attacks and rounds retained durations up when switching to eighths', () => {
     localStorage.setItem('bass-beat-ruler', JSON.stringify({
       version: 3,

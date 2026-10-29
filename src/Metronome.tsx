@@ -3,6 +3,7 @@ import {
   Alert,
   Badge,
   Button,
+  Center,
   Checkbox,
   Container,
   Group,
@@ -20,6 +21,7 @@ import {
   type Subdivision,
 } from './audio/metronome'
 import { GRID_STEPS_PER_BEAT } from './rhythm/pattern'
+import { ToolPanelHeader } from './ToolPanelHeader'
 
 const DEFAULT_SETTINGS: MetronomeSettings = {
   bpm: 80,
@@ -115,16 +117,16 @@ export default function Metronome() {
 
   const totalSteps = settings.beatsPerBar * settings.subdivision
 
-  return <Container size="md" className="tool-container"><Paper component="section" className="tool-panel metronome" withBorder aria-label="Metronome">
-    <Group className="tool-heading" justify="space-between">
-      <Text fw={800}>METRONOME</Text>
-      <Badge color={running ? 'green' : 'gray'} variant="light">{starting ? 'Loading sounds' : running ? 'Playing' : 'Ready'}</Badge>
-    </Group>
+  return <Container size="md" w="100%" px={{ base: 'sm', sm: 'md' }}><Paper component="section" className="metronome" withBorder shadow="xs" bg="white" style={{ overflow: 'hidden' }} aria-label="Metronome">
+    <ToolPanelHeader title="METRONOME" status={<Badge color={running ? 'green' : 'gray'} variant="light">{starting ? 'Loading sounds' : running ? 'Playing' : 'Ready'}</Badge>} />
 
-    <div className="tempo-control">
-      <Button variant="default" size="lg" px="sm" type="button" aria-label="Decrease tempo" onClick={() => adjustBpm(-1)}><Minus size={20} /></Button>
+    <Group mt={42} mb={28} justify="center" align="flex-start" gap={14} wrap="nowrap">
+      <Center h={68}>
+        <Button variant="default" size="lg" px="sm" type="button" aria-label="Decrease tempo" onClick={() => adjustBpm(-1)}><Minus size={20} /></Button>
+      </Center>
       <Stack gap={4} align="center">
         <NumberInput
+          w={{ base: 128, sm: 140 }}
           aria-label="Tempo in BPM"
           role="spinbutton"
           min={30}
@@ -132,12 +134,15 @@ export default function Metronome() {
           value={settings.bpm}
           clampBehavior="strict"
           hideControls
+          styles={{ input: { height: 68, paddingInline: 0, border: 0, background: 'transparent', fontSize: 56, fontWeight: 750, lineHeight: 1, textAlign: 'center' } }}
           onChange={(value) => setSettings((current) => ({ ...current, bpm: Math.min(240, Math.max(30, Number(value) || 30)) }))}
         />
         <Text size="xs" c="dimmed" fw={700}>BPM</Text>
       </Stack>
-      <Button variant="default" size="lg" px="sm" type="button" aria-label="Increase tempo" onClick={() => adjustBpm(1)}><Plus size={20} /></Button>
-    </div>
+      <Center h={68}>
+        <Button variant="default" size="lg" px="sm" type="button" aria-label="Increase tempo" onClick={() => adjustBpm(1)}><Plus size={20} /></Button>
+      </Center>
+    </Group>
 
     <div className="pulse-ruler" aria-label={`${settings.beatsPerBar} beat bar with ${settings.subdivision} subdivisions per beat`}>
       {Array.from({ length: totalSteps }, (_, step) => {
@@ -185,6 +190,5 @@ export default function Metronome() {
       leftSection={running ? <Square size={16} fill="currentColor" /> : <Play size={17} fill="currentColor" />}>
       {starting ? 'Loading…' : running ? 'Stop' : 'Start'}
     </Button>
-    <Text className="keyboard-hint" c="dimmed" size="xs">30–240 BPM · settings are saved automatically</Text>
   </Paper></Container>
 }

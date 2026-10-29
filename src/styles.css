@@ -1,16 +1,15 @@
 :root {
-  color: #201d27;
-  background: #f7f6f9;
+  color: var(--mantine-color-myColor-9);
+  background: var(--mantine-color-myColor-0);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 }
 
 html { scrollbar-gutter: stable; }
 * { box-sizing: border-box; }
-body { margin: 0; min-width: 320px; min-height: 100vh; background: #f7f6f9; }
+body { margin: 0; min-width: 320px; min-height: 100vh; background: var(--mantine-color-myColor-0); }
 button, input, select { font: inherit; }
 
-.app { min-height: 100vh; background: #f7f6f9; }
 .app::before {
   content: '';
   position: fixed;
@@ -55,27 +54,10 @@ button, input, select { font: inherit; }
 .tool-tabs a:hover { background: rgb(255 255 255 / 10%); color: white; }
 .tool-tabs a.selected { background: white; color: var(--mantine-primary-color-filled); }
 
-.route-stage { position: relative; min-height: 100dvh; padding: calc(var(--app-shell-header-offset, 72px) + 28px) 0 48px; }
-.tool-container { width: 100%; }
-.tool-panel { overflow: hidden; background: white; box-shadow: 0 2px 12px rgb(28 22 40 / 4%); }
-.tool-heading { min-height: 58px; padding: 0 22px; border-bottom: 1px solid var(--mantine-color-gray-2); }
-.tool-heading > p:first-child { color: var(--mantine-color-dark-7); font-size: 12px; letter-spacing: .12em; }
-
-.practice { display: flex; min-height: calc(100dvh - var(--app-shell-header-offset, 72px) - 76px); align-items: center; justify-content: center; }
-.practice-card { width: min(620px, 100%); background: white; text-align: center; box-shadow: 0 2px 12px rgb(28 22 40 / 4%); }
-.practice-controls { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; }
-.instrument-switch { align-items: flex-start; }
-.eyebrow { margin: clamp(48px, 8vh, 82px) 0 12px; color: var(--mantine-color-dimmed); font-size: 10px; font-weight: 750; letter-spacing: .15em; }
-.prompt-frame { height: clamp(180px, 28vh, 250px); display: flex; align-items: center; justify-content: center; }
-.letter-prompt { display: flex; flex-direction: column; align-items: center; line-height: 1; }
 .letter-name { display: flex; align-items: flex-start; font-family: Georgia, 'Times New Roman', serif; font-size: clamp(112px, 22vh, 168px); letter-spacing: -.08em; }
 .letter-name sup { margin-top: .12em; font-family: inherit; font-size: .36em; letter-spacing: 0; }
-.letter-prompt small { margin-top: 15px; color: var(--mantine-color-dimmed); font-size: 12px; font-weight: 700; letter-spacing: .13em; text-transform: uppercase; }
 .bass-staff { width: min(420px, 100%); min-width: 0; max-height: 100%; overflow: visible; }
 .bass-staff svg { width: 100%; height: auto; display: block; overflow: visible; }
-.feedback-message { min-height: 28px; margin: 6px 0 22px; color: var(--mantine-color-dimmed); font-size: 13px; }
-.feedback-correct .feedback-message { color: var(--mantine-color-green-7); }
-.feedback-wrong .feedback-message { color: var(--mantine-color-red-7); }
 .primary-button { min-width: 164px; }
 
 .tuner { padding-bottom: 30px; text-align: center; }
@@ -94,8 +76,6 @@ button, input, select { font: inherit; }
 .tuner-readout small { color: var(--mantine-color-dimmed); font-size: 10px; }
 
 .metronome { text-align: center; }
-.tempo-control { margin: 42px auto 28px; display: flex; align-items: center; justify-content: center; gap: 14px; }
-.tempo-control .mantine-NumberInput-input { width: 130px; height: 68px; border: 0; background: transparent; font-size: 56px; font-weight: 750; line-height: 1; text-align: center; }
 .pulse-ruler { width: min(680px, calc(100% - 44px)); height: 88px; margin: 0 auto 38px; display: flex; align-items: flex-end; border-bottom: 2px solid var(--mantine-color-gray-4); }
 .pulse-step { position: relative; height: 100%; flex: 1; }
 .pulse-step i { position: absolute; bottom: 0; left: 50%; width: 2px; height: 28px; background: var(--mantine-color-gray-4); transform: translateX(-50%); transition: height 70ms, background 70ms; }
@@ -112,12 +92,9 @@ button, input, select { font: inherit; }
 .volume-control input { width: 100%; min-width: 0; accent-color: var(--mantine-primary-color-filled); cursor: pointer; }
 .volume-control output { color: var(--mantine-color-dark-7); font-size: 11px; letter-spacing: 0; text-align: right; }
 .check-control { grid-column: 1 / 4; }
-.metronome-start { margin-top: 28px; }
-.keyboard-hint { margin: 13px 0 28px; }
+.metronome-start { margin: 28px 0; }
 
-.beat-ruler-container { max-width: 1120px; }
 .beat-ruler { width: 100%; }
-.ruler-toolbar { min-height: 76px; padding: 16px 22px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .compact-tempo { width: 92px; }
 .compact-tempo .mantine-InputWrapper-label { color: var(--mantine-color-dimmed); font-size: 10px; font-weight: 700; letter-spacing: .1em; }
 .compact-tempo input { text-align: center; }
@@ -183,25 +160,10 @@ button, input, select { font: inherit; }
   .tool-tabs::-webkit-scrollbar { display: none; }
   .tool-tabs a { min-height: 40px; padding-inline: 12px; flex: 1 0 auto; justify-content: center; font-size: 12px; }
   .tool-tabs a svg { display: block; }
-  .route-stage { padding: calc(var(--app-shell-header-offset, 116px) + 14px) 0 30px; }
-  .practice { min-height: calc(100dvh - 116px - 44px); padding-inline: 12px; }
-  .practice-card { padding: 18px 14px 24px; }
-  .practice-controls { align-items: stretch; flex-direction: column; gap: 10px; }
-  .practice-controls .mantine-ButtonGroup-root { display: flex; width: 100%; }
-  .practice-controls .mantine-Button-root { flex: 1; }
-  .instrument-switch { align-items: stretch; }
-  .instrument-switch > p { display: none; }
-  .eyebrow { margin-top: 38px; }
-  .prompt-frame { height: 205px; }
-  .tool-container { padding-inline: 12px; }
-  .tool-heading { min-height: 54px; padding-inline: 16px; }
   .metronome-options { padding: 22px 16px; grid-template-columns: 1fr 1fr; gap: 18px 12px; }
   .control-fieldset { grid-column: 1 / 3; }
   .check-control { grid-column: 1 / 3; }
   .pulse-ruler { width: calc(100% - 32px); }
-  .beat-ruler-container { padding-inline: 0; }
-  .beat-ruler { border-inline: 0; border-radius: 0; }
-  .ruler-toolbar { padding-inline: 14px; }
   .ruler-track-stack { margin-inline: 12px; }
   .beat-ruler-track { height: 162px; overflow-x: auto; }
   .ruler-note { top: 58px; }
@@ -219,7 +181,6 @@ button, input, select { font: inherit; }
   .listening-state { max-width: 128px; }
   .tool-tabs a { padding-inline: 10px; }
   .tool-tabs a svg { display: none; }
-  .tempo-control .mantine-NumberInput-input { width: 110px; font-size: 50px; }
   .metronome-options { grid-template-columns: 1fr; }
   .control-fieldset, .check-control { grid-column: 1; }
   .control-fieldset .mantine-ButtonGroup-root { display: flex; }
