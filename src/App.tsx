@@ -1,4 +1,4 @@
-import { createContext, lazy, Suspense, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createContext, lazy, Suspense, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import {
   createRootRoute,
   createRoute,
@@ -8,17 +8,34 @@ import {
   RouterProvider,
   useRouterState,
 } from '@tanstack/react-router'
+import {
+  Alert,
+  AppShell as MantineAppShell,
+  Badge,
+  Button,
+  Center,
+  Container,
+  Group,
+  Loader,
+  Paper,
+  Stack,
+  Text,
+  UnstyledButton,
+} from '@mantine/core'
+import { Activity, AudioLines, CircleGauge, Mic, Music2, Square, Timer } from 'lucide-react'
 import { BassMicrophoneAnalyzer, type AudioSnapshot } from './audio/microphone'
 import { frequencyToNote } from './audio/pitch'
 import {
   randomTarget,
   targetMatches,
+  type BassStringCount,
   type ExerciseTarget,
   type PracticeMode,
 } from './exercise'
 import './styles.css'
 
 const Metronome = lazy(() => import('./Metronome'))
+const BeatRuler = lazy(() => import('./BeatRuler'))
 
 const initialSnapshot: AudioSnapshot = { state: 'idle', reading: null, signalLevel: 0 }
 type Feedback = 'neutral' | 'correct' | 'wrong'
@@ -29,7 +46,9 @@ interface ToolsContextValue {
   target: ExerciseTarget
   feedback: Feedback
   listening: boolean
+  stringCount: BassStringCount
   selectMode: (mode: PracticeMode) => void
+  selectStringCount: (stringCount: BassStringCount) => void
   toggleMicrophone: () => Promise<void>
 }
 
@@ -45,10 +64,15 @@ function savedMode(): PracticeMode {
   return localStorage.getItem('bass-note-finder-mode') === 'staff' ? 'staff' : 'note'
 }
 
-function AppShell() {
+function savedStringCount(): BassStringCount {
+  return localStorage.getItem('bass-note-finder-strings') === '4' ? 4 : 5
+}
+
+function ToolShell() {
   const [snapshot, setSnapshot] = useState(initialSnapshot)
   const [mode, setMode] = useState<PracticeMode>(savedMode)
-  const [target, setTarget] = useState<ExerciseTarget>(() => randomTarget(savedMode()))
+  const [stringCount, setStringCount] = useState<BassStringCount>(savedStringCount)
+  const [target, setTarget] = useState<ExerciseTarget>(() => randomTarget(savedMode(), undefined, savedStringCount()))
   const [feedback, setFeedback] = useState<Feedback>('neutral')
   const analyzer = useRef<BassMicrophoneAnalyzer | null>(null)
   const advanceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -57,7 +81,7 @@ function AppShell() {
   const playedNote = snapshot.reading ? frequencyToNote(snapshot.reading.frequency) : null
   const pathname = useRouterState({ select: (state) => state.location.pathname })
   const isPractice = pathname === '/'
-  const isMetronome = pathname === '/metronome'
+  const isTimingTool = pathname === '/metronome' || pathname === '/beat-ruler'
 
   useEffect(() => () => {
     analyzer.current?.stop()
@@ -76,13 +100,13 @@ function AppShell() {
       setFeedback('correct')
       ignoredHeldMidi.current = playedNote.midi
       advanceTimer.current = setTimeout(() => {
-        setTarget((current) => randomTarget(mode, current))
+        setTarget((current) => randomTarget(mode, current, stringCount))
         setFeedback('neutral')
       }, 480)
     } else {
       setFeedback('wrong')
     }
-  }, [snapshot.reading?.stable, snapshot.reading?.frequency, playedNote?.midi, target, mode, feedback, isPractice])
+  }, [snapshot.reading?.stable, snapshot.reading?.frequency, playedNote?.midi, target, mode, stringCount, feedback, isPractice])
 
   useEffect(() => {
     if (!snapshot.reading?.stable) setFeedback((current) => current === 'correct' ? current : 'neutral')
@@ -90,11 +114,11 @@ function AppShell() {
 
   useEffect(() => {
     setFeedback('neutral')
-    if (isMetronome && analyzer.current) {
+    if (isTimingTool && analyzer.current) {
       analyzer.current.stop()
       analyzer.current = null
     }
-  }, [pathname, isMetronome])
+  }, [pathname, isTimingTool])
 
   const toggleMicrophone = async () => {
     if (listening || snapshot.state === 'requesting') {
@@ -113,7 +137,17 @@ function AppShell() {
     if (advanceTimer.current) clearTimeout(advanceTimer.current)
     localStorage.setItem('bass-note-finder-mode', nextMode)
     setMode(nextMode)
-    setTarget(randomTarget(nextMode))
+    setTarget(randomTarget(nextMode, undefined, stringCount))
+    setFeedback('neutral')
+    ignoredHeldMidi.current = playedNote?.midi ?? null
+  }
+
+  const selectStringCount = (nextStringCount: BassStringCount) => {
+    if (nextStringCount === stringCount) return
+    if (advanceTimer.current) clearTimeout(advanceTimer.current)
+    localStorage.setItem('bass-note-finder-strings', String(nextStringCount))
+    setStringCount(nextStringCount)
+    setTarget(randomTarget(mode, undefined, nextStringCount))
     setFeedback('neutral')
     ignoredHeldMidi.current = playedNote?.midi ?? null
   }
@@ -123,45 +157,60 @@ function AppShell() {
     denied: 'Permission blocked', unavailable: 'Microphone unavailable', error: 'Audio error',
   }[snapshot.state]
 
-  return (
-    <main className={`app feedback-${feedback}`}>
-      <header className="app-header">
-        <Link className="brand" to="/">Bass Tools</Link>
+  return <MantineAppShell className={`app feedback-${feedback}`} header={{ height: { base: 116, sm: 72 } }}>
+    <MantineAppShell.Header className="app-header" withBorder={false}>
+      <Container size="lg" h="100%" px={{ base: 'sm', sm: 'md' }}>
+        <Group className="header-row" h={{ base: 62, sm: '100%' }} justify="space-between" wrap="nowrap">
+          <UnstyledButton component={Link} to="/" className="brand" aria-label="Bass Tools home">
+            <Group gap={9} wrap="nowrap">
+              <Music2 size={27} strokeWidth={2.2} aria-hidden />
+              <Text component="span" fw={800} fz="xl" c="white">Bass Tools</Text>
+            </Group>
+          </UnstyledButton>
+          {!isTimingTool && <Badge className="listening-state" variant="white" color={listening ? 'green' : 'gray'}
+            leftSection={<span className="status-dot" />} size="lg" radius="xl">{statusLabel}</Badge>}
+        </Group>
         <nav className="tool-tabs" aria-label="Tools">
-          <Link to="/" activeOptions={{ exact: true }} activeProps={{ className: 'selected' }}>Note Finder</Link>
-          <Link to="/tuner" activeProps={{ className: 'selected' }}>Tuner</Link>
-          <Link to="/metronome" activeProps={{ className: 'selected' }}>Metronome</Link>
+          <ToolLink to="/" exact icon={<Activity size={17} />}>Note Finder</ToolLink>
+          <ToolLink to="/tuner" icon={<CircleGauge size={17} />}>Tuner</ToolLink>
+          <ToolLink to="/metronome" icon={<Timer size={17} />}>Metronome</ToolLink>
+          <ToolLink to="/beat-ruler" icon={<AudioLines size={17} />}>Beat Ruler</ToolLink>
         </nav>
-        <span className={`listening-state ${listening ? 'active' : ''} ${isMetronome ? 'placeholder' : ''}`}>
-          <i />{statusLabel}
-        </span>
-      </header>
+      </Container>
+    </MantineAppShell.Header>
 
-      <ToolsContext.Provider value={{ snapshot, mode, target, feedback, listening, selectMode, toggleMicrophone }}>
-        <div className="route-stage"><Outlet /></div>
+    <MantineAppShell.Main className="route-stage">
+      <ToolsContext.Provider value={{ snapshot, mode, target, feedback, listening, stringCount, selectMode, selectStringCount, toggleMicrophone }}>
+        <Outlet />
       </ToolsContext.Provider>
+      {snapshot.error && <Container size="sm" mt="md"><Alert color="red" role="alert">{snapshot.error}</Alert></Container>}
+    </MantineAppShell.Main>
+  </MantineAppShell>
+}
 
-      {snapshot.error && <p className="error" role="alert">{snapshot.error}</p>}
-
-      {isPractice && <footer className="instrument-footer">
-        <span>Standard 5-string · B–E–A–D–G</span>
-      </footer>}
-    </main>
-  )
+function ToolLink({ to, exact, icon, children }: { to: '/' | '/tuner' | '/metronome' | '/beat-ruler'; exact?: boolean; icon: ReactNode; children: ReactNode }) {
+  return <Link to={to} activeOptions={exact ? { exact: true } : undefined} activeProps={{ className: 'selected' }}>
+    {icon}<span>{children}</span>
+  </Link>
 }
 
 function PracticeRoute() {
-  const { mode, target, feedback, listening, selectMode, snapshot, toggleMicrophone } = useTools()
+  const { mode, target, feedback, listening, stringCount, selectMode, selectStringCount, snapshot, toggleMicrophone } = useTools()
 
-  return <section className="practice" id="practice" aria-live="polite">
-    <ModeSwitch mode={mode} onChange={selectMode} />
-    <p className="eyebrow">PLAY THIS {mode === 'staff' ? 'PITCH' : 'NOTE'}</p>
+  return <Container size="sm" className="practice" id="practice" aria-live="polite">
+    <Paper className="practice-card" withBorder p={{ base: 'lg', sm: 36 }}>
+    <div className="practice-controls">
+      <ModeSwitch mode={mode} onChange={selectMode} />
+      <InstrumentSwitch stringCount={stringCount} onChange={selectStringCount} />
+    </div>
+    <Text className="eyebrow">PLAY THIS {mode === 'staff' ? 'PITCH' : 'NOTE'}</Text>
     <div className="prompt-frame">
       {mode === 'note' ? <NotePrompt target={target} /> : <BassStaff target={target} />}
     </div>
     <FeedbackMessage feedback={feedback} listening={listening} />
     <MicrophoneControl snapshot={snapshot} onToggle={toggleMicrophone} />
-  </section>
+    </Paper>
+  </Container>
 }
 
 function TunerRoute() {
@@ -169,15 +218,20 @@ function TunerRoute() {
   return <Tuner snapshot={snapshot} onToggle={toggleMicrophone} />
 }
 
-const rootRoute = createRootRoute({ component: AppShell })
+const rootRoute = createRootRoute({ component: ToolShell })
 const practiceRoute = createRoute({ getParentRoute: () => rootRoute, path: '/', component: PracticeRoute })
 const tunerRoute = createRoute({ getParentRoute: () => rootRoute, path: '/tuner', component: TunerRoute })
 const metronomeRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/metronome',
-  component: () => <Suspense fallback={<p className="route-loading">Loading metronome…</p>}><Metronome /></Suspense>,
+  component: () => <Suspense fallback={<Center h={240}><Loader /></Center>}><Metronome /></Suspense>,
 })
-const routeTree = rootRoute.addChildren([practiceRoute, tunerRoute, metronomeRoute])
+const beatRulerRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/beat-ruler',
+  component: () => <Suspense fallback={<Center h={240}><Loader /></Center>}><BeatRuler /></Suspense>,
+})
+const routeTree = rootRoute.addChildren([practiceRoute, tunerRoute, metronomeRoute, beatRulerRoute])
 
 export function createAppRouter() {
   return createRouter({ routeTree })
@@ -195,10 +249,20 @@ function App() {
 }
 
 function ModeSwitch({ mode, onChange }: { mode: PracticeMode; onChange: (mode: PracticeMode) => void }) {
-  return <div className="mode-switch" aria-label="Exercise mode">
-    <button type="button" className={mode === 'note' ? 'selected' : ''} onClick={() => onChange('note')}>Note name</button>
-    <button type="button" className={mode === 'staff' ? 'selected' : ''} onClick={() => onChange('staff')}>Bass clef</button>
-  </div>
+  return <Button.Group aria-label="Exercise mode">
+    <Button variant={mode === 'note' ? 'filled' : 'default'} className={mode === 'note' ? 'selected' : ''} onClick={() => onChange('note')}>Note name</Button>
+    <Button variant={mode === 'staff' ? 'filled' : 'default'} className={mode === 'staff' ? 'selected' : ''} onClick={() => onChange('staff')}>Bass clef</Button>
+  </Button.Group>
+}
+
+function InstrumentSwitch({ stringCount, onChange }: { stringCount: BassStringCount; onChange: (stringCount: BassStringCount) => void }) {
+  return <Stack gap={5} className="instrument-switch">
+    <Text size="xs" c="dimmed" fw={700}>STANDARD</Text>
+    <Button.Group aria-label="Bass configuration">
+      <Button size="sm" variant={stringCount === 4 ? 'filled' : 'default'} className={stringCount === 4 ? 'selected' : ''} onClick={() => onChange(4)}>4 string</Button>
+      <Button size="sm" variant={stringCount === 5 ? 'filled' : 'default'} className={stringCount === 5 ? 'selected' : ''} onClick={() => onChange(5)}>5 string</Button>
+    </Button.Group>
+  </Stack>
 }
 
 function NotePrompt({ target }: { target: ExerciseTarget }) {
@@ -254,14 +318,15 @@ function BassStaff({ target }: { target: ExerciseTarget }) {
 
 function FeedbackMessage({ feedback, listening }: { feedback: Feedback; listening: boolean }) {
   const message = feedback === 'correct' ? 'That’s it' : feedback === 'wrong' ? 'Try another note' : listening ? 'Listening…' : 'Start the microphone when you’re ready'
-  return <p className="feedback-message" aria-live="assertive"><i />{message}</p>
+  return <Group className="feedback-message" gap="xs" justify="center" aria-live="assertive"><span className="status-dot" />{message}</Group>
 }
 
 function MicrophoneControl({ snapshot, onToggle, purpose = 'practice' }: { snapshot: AudioSnapshot; onToggle: () => void; purpose?: 'practice' | 'tuner' }) {
   const listening = snapshot.state === 'listening'
-  return <button className="primary-button" type="button" onClick={onToggle} disabled={snapshot.state === 'requesting'}>
+  return <Button className="primary-button" size="md" type="button" onClick={onToggle} loading={snapshot.state === 'requesting'}
+    leftSection={listening ? <Square size={17} fill="currentColor" /> : <Mic size={18} />}>
     {listening ? `Stop ${purpose}` : snapshot.state === 'requesting' ? 'Waiting…' : `Start ${purpose}`}
-  </button>
+  </Button>
 }
 
 function Tuner({ snapshot, onToggle }: { snapshot: AudioSnapshot; onToggle: () => void }) {
@@ -270,8 +335,8 @@ function Tuner({ snapshot, onToggle }: { snapshot: AudioSnapshot; onToggle: () =
   const cents = note ? Math.round(note.cents) : 0
   const meterPosition = Math.max(0, Math.min(100, 50 + cents))
 
-  return <section className={`tool-panel tuner ${stable ? 'is-stable' : ''}`} aria-live="polite">
-    <div className="tuner-heading"><span>TUNER</span><small>{stable ? 'Note locked' : 'Play a note'}</small></div>
+  return <Container size="sm" className="tool-container"><Paper component="section" className={`tool-panel tuner ${stable ? 'is-stable' : ''}`} withBorder aria-live="polite" aria-label="Tuner">
+    <Group className="tool-heading" justify="space-between"><Text fw={800}>TUNER</Text><Badge color={stable ? 'green' : 'gray'} variant="light">{stable ? 'Note locked' : 'Play a note'}</Badge></Group>
     <div className="note-display">
       <span className="note-name">{stable && note ? note.note : '—'}</span>
       <span className="octave">{stable && note ? `octave ${note.octave}` : 'WAITING FOR A STABLE NOTE'}</span>
@@ -285,7 +350,7 @@ function Tuner({ snapshot, onToggle }: { snapshot: AudioSnapshot; onToggle: () =
       <span>{note ? `${cents > 0 ? '+' : ''}${cents}` : '—'} <small>cents</small></span>
     </div>
     <MicrophoneControl snapshot={snapshot} onToggle={onToggle} purpose="tuner" />
-  </section>
+  </Paper></Container>
 }
 
 export default App

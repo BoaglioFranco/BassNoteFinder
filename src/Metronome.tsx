@@ -1,5 +1,19 @@
 import { useEffect, useRef, useState } from 'react'
 import {
+  Alert,
+  Badge,
+  Button,
+  Checkbox,
+  Container,
+  Group,
+  NativeSelect,
+  NumberInput,
+  Paper,
+  Stack,
+  Text,
+} from '@mantine/core'
+import { Minus, Play, Plus, Square } from 'lucide-react'
+import {
   MetronomeEngine,
   type MetronomeSound,
   type MetronomeSettings,
@@ -101,26 +115,28 @@ export default function Metronome() {
 
   const totalSteps = settings.beatsPerBar * settings.subdivision
 
-  return <section className="tool-panel metronome" aria-label="Metronome">
-    <div className="tool-heading">
-      <span>METRONOME</span>
-      <small>{starting ? 'Loading sounds' : running ? 'Playing' : 'Ready'}</small>
-    </div>
+  return <Container size="md" className="tool-container"><Paper component="section" className="tool-panel metronome" withBorder aria-label="Metronome">
+    <Group className="tool-heading" justify="space-between">
+      <Text fw={800}>METRONOME</Text>
+      <Badge color={running ? 'green' : 'gray'} variant="light">{starting ? 'Loading sounds' : running ? 'Playing' : 'Ready'}</Badge>
+    </Group>
 
     <div className="tempo-control">
-      <button type="button" aria-label="Decrease tempo" onClick={() => adjustBpm(-1)}>−</button>
-      <label>
-        <input
+      <Button variant="default" size="lg" px="sm" type="button" aria-label="Decrease tempo" onClick={() => adjustBpm(-1)}><Minus size={20} /></Button>
+      <Stack gap={4} align="center">
+        <NumberInput
           aria-label="Tempo in BPM"
-          type="number"
-          min="30"
-          max="240"
+          role="spinbutton"
+          min={30}
+          max={240}
           value={settings.bpm}
-          onChange={(event) => setSettings((current) => ({ ...current, bpm: Math.min(240, Math.max(30, Number(event.target.value) || 30)) }))}
+          clampBehavior="strict"
+          hideControls
+          onChange={(value) => setSettings((current) => ({ ...current, bpm: Math.min(240, Math.max(30, Number(value) || 30)) }))}
         />
-        <span>BPM</span>
-      </label>
-      <button type="button" aria-label="Increase tempo" onClick={() => adjustBpm(1)}>+</button>
+        <Text size="xs" c="dimmed" fw={700}>BPM</Text>
+      </Stack>
+      <Button variant="default" size="lg" px="sm" type="button" aria-label="Increase tempo" onClick={() => adjustBpm(1)}><Plus size={20} /></Button>
     </div>
 
     <div className="pulse-ruler" aria-label={`${settings.beatsPerBar} beat bar with ${settings.subdivision} subdivisions per beat`}>
@@ -133,25 +149,19 @@ export default function Metronome() {
       })}
     </div>
 
-    <div className="metronome-options">
-      <fieldset>
+    <div className="metronome-options" aria-label="Metronome settings">
+      <fieldset className="control-fieldset">
         <legend>SUBDIVISION</legend>
-        <div className="segmented-control">
+        <Button.Group>
           {([[1, '♩ Quarter'], [2, '♪ Eighth'], [4, '♬ 16th']] as const).map(([value, label]) =>
-            <button key={value} type="button" className={settings.subdivision === value ? 'selected' : ''} onClick={() => setSettings((current) => ({ ...current, subdivision: value as Subdivision }))}>{label}</button>
+            <Button key={value} type="button" variant={settings.subdivision === value ? 'filled' : 'default'} size="sm" onClick={() => setSettings((current) => ({ ...current, subdivision: value as Subdivision }))}>{label}</Button>
           )}
-        </div>
+        </Button.Group>
       </fieldset>
-      <label className="select-control">BEATS PER BAR
-        <select value={settings.beatsPerBar} onChange={(event) => setSettings((current) => ({ ...current, beatsPerBar: Number(event.target.value) }))}>
-          {[2, 3, 4, 5, 6].map((beats) => <option key={beats} value={beats}>{beats}</option>)}
-        </select>
-      </label>
-      <label className="select-control">SOUND
-        <select value={settings.sound} onChange={(event) => setSettings((current) => ({ ...current, sound: event.target.value as MetronomeSound }))}>
-          {SOUNDS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-        </select>
-      </label>
+      <NativeSelect id="metronome-beats" label="BEATS PER BAR" value={String(settings.beatsPerBar)} onChange={(event) => setSettings((current) => ({ ...current, beatsPerBar: Number(event.target.value) }))}
+        data={[2, 3, 4, 5, 6].map(String)} />
+      <NativeSelect id="metronome-sound" label="SOUND" value={settings.sound} onChange={(event) => setSettings((current) => ({ ...current, sound: event.target.value as MetronomeSound }))}
+        data={SOUNDS.map(([value, label]) => ({ value, label }))} />
       <label className="volume-control">VOLUME
         <span>
           <input
@@ -166,14 +176,15 @@ export default function Metronome() {
           <output>{Math.round(settings.volume * 100)}%</output>
         </span>
       </label>
-      <label className="check-control">
-        <input type="checkbox" checked={settings.accentFirstBeat} onChange={(event) => setSettings((current) => ({ ...current, accentFirstBeat: event.target.checked }))} />
-        Accent first beat
-      </label>
+      <Checkbox id="metronome-accent" className="check-control" label="Accent first beat" checked={settings.accentFirstBeat}
+        onChange={(event) => setSettings((current) => ({ ...current, accentFirstBeat: event.currentTarget.checked }))} />
     </div>
 
-    {audioError && <p className="error" role="alert">{audioError}</p>}
-    <button className="primary-button metronome-start" type="button" disabled={starting} onClick={() => void toggle()}>{starting ? 'Loading…' : running ? 'Stop' : 'Start'}</button>
-    <p className="keyboard-hint">30–240 BPM · settings are saved automatically</p>
-  </section>
+    {audioError && <Alert mx="lg" mb="md" color="red" role="alert">{audioError}</Alert>}
+    <Button className="primary-button metronome-start" size="md" type="button" loading={starting} onClick={() => void toggle()}
+      leftSection={running ? <Square size={16} fill="currentColor" /> : <Play size={17} fill="currentColor" />}>
+      {starting ? 'Loading…' : running ? 'Stop' : 'Start'}
+    </Button>
+    <Text className="keyboard-hint" c="dimmed" size="xs">30–240 BPM · settings are saved automatically</Text>
+  </Paper></Container>
 }

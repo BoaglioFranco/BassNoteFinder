@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AudioSnapshot } from './audio/microphone'
 import App from './App'
+import { render } from './test-utils'
 
 const microphone = vi.hoisted(() => ({
   callback: undefined as ((snapshot: AudioSnapshot) => void) | undefined,
@@ -56,8 +57,20 @@ describe('App', () => {
     expect(screen.getByLabelText('Play C')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Start practice' })).toBeTruthy()
     expect(screen.getByRole('navigation', { name: 'Tools' })).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Note Finder' }).getAttribute('href')).toBe('/')
     expect(screen.getByRole('link', { name: 'Tuner' }).getAttribute('href')).toBe('/tuner')
     expect(screen.getByRole('link', { name: 'Metronome' }).getAttribute('href')).toBe('/metronome')
+    expect(screen.getByRole('link', { name: 'Beat Ruler' }).getAttribute('href')).toBe('/beat-ruler')
+    expect(screen.getByRole('button', { name: '5 string' }).classList.contains('selected')).toBe(true)
+    expect(document.querySelector('footer')).toBeNull()
+  })
+
+  it('switches bass configuration and remembers the selection', async () => {
+    await renderApp()
+    fireEvent.click(screen.getByRole('button', { name: '4 string' }))
+
+    expect(localStorage.getItem('bass-note-finder-strings')).toBe('4')
+    expect(screen.getByRole('button', { name: '4 string' }).classList.contains('selected')).toBe(true)
   })
 
   it('matches any octave in note-name mode and gives green feedback', async () => {
@@ -136,6 +149,15 @@ describe('App', () => {
     expect(localStorage.getItem('bass-metronome-settings')).toContain('"sound":"drums"')
     expect(localStorage.getItem('bass-metronome-settings')).toContain('"volume":0.4')
     expect(screen.getByLabelText('4 beat bar with 4 subdivisions per beat').children).toHaveLength(16)
+  })
+
+  it('routes to the beat ruler as a separate tool', async () => {
+    await renderApp()
+    fireEvent.click(screen.getByRole('link', { name: 'Beat Ruler' }))
+
+    expect(await screen.findByRole('region', { name: 'Beat Ruler' })).toBeTruthy()
+    expect(window.location.pathname).toBe('/beat-ruler')
+    expect(screen.getByLabelText('1 bar, 4 beats per bar, sixteenth-note grid')).toBeTruthy()
   })
 
   it('stops an active analyzer when the component unmounts', async () => {

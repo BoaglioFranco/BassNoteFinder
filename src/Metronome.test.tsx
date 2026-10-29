@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import Metronome from './Metronome'
+import { render } from './test-utils'
 
 const engine = vi.hoisted(() => ({
   instances: [] as Array<{ callback: (tick: { gridStep: number }) => void }>,

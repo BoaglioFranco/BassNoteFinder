@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { HIGH_G_MIDI, LOW_B_MIDI, randomTarget, targetForMidi, targetMatches } from './exercise'
+import { HIGH_G_MIDI, LOW_B_MIDI, LOW_E_MIDI, randomTarget, targetForMidi, targetMatches } from './exercise'
 
 describe('exercise targets', () => {
   it('uses the five-string, twelve-fret range for staff practice', () => {
@@ -9,6 +9,12 @@ describe('exercise targets', () => {
     random.mockReturnValue(0.9999)
     expect(randomTarget('staff').midi).toBe(HIGH_G_MIDI)
     vi.restoreAllMocks()
+  })
+
+  it('starts at low E for four-string staff practice', () => {
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0)
+    expect(randomTarget('staff', undefined, 4).midi).toBe(LOW_E_MIDI)
+    random.mockRestore()
   })
 
   it('treats octaves differently in the two modes', () => {

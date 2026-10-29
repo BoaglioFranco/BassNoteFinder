@@ -4,8 +4,9 @@ export const TICKS_PER_GRID_STEP = TONE_PPQ / GRID_STEPS_PER_BEAT
 
 export type Subdivision = 1 | 2 | 4
 export type MetronomeSound = 'click' | 'woodblock' | 'drums' | 'hihat'
-export type RhythmVoice = 'click' | 'woodblock' | 'kick' | 'snare' | 'hihat' | 'bass'
+export type RhythmVoice = 'click' | 'woodblock' | 'kick' | 'snare' | 'hihat' | 'bass' | 'pickedBass' | 'synthBass'
 export type RhythmEmphasis = 'downbeat' | 'beat' | 'subdivision'
+export type RhythmAudioTrack = 'pulse' | 'cue'
 
 export interface RhythmEvent {
   id: string
@@ -16,6 +17,8 @@ export interface RhythmEvent {
   accent?: boolean
   /** Musical role used by instruments to make the pulse hierarchy audible. */
   emphasis?: RhythmEmphasis
+  /** Independent audio lane; prevents simultaneous pulse and cue voices from competing. */
+  audioTrack?: RhythmAudioTrack
 }
 
 export interface RhythmPattern {
@@ -98,6 +101,7 @@ export function createMetronomePattern(options: MetronomePatternOptions): Rhythm
         velocity: onBeat ? 0.5 : 0.34,
         accent,
         emphasis,
+        audioTrack: 'pulse',
       })
       if (onBeat) {
         events.push({
@@ -108,6 +112,7 @@ export function createMetronomePattern(options: MetronomePatternOptions): Rhythm
           velocity: accent ? 1 : 0.82,
           accent,
           emphasis,
+          audioTrack: 'pulse',
         })
       }
       continue
@@ -121,6 +126,7 @@ export function createMetronomePattern(options: MetronomePatternOptions): Rhythm
       velocity: accent ? 1 : onBeat ? 0.78 : 0.48,
       accent,
       emphasis,
+      audioTrack: 'pulse',
     })
   }
 

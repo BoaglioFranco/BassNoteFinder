@@ -10,8 +10,11 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@mantine/core": "^9.7.4",
+    "@mantine/hooks": "^9.7.4",
     "@tanstack/react-router": "^1.170.42",
     "@vitejs/plugin-react": "latest",
+    "lucide-react": "^0.468.0",
     "react": "latest",
     "react-dom": "latest",
     "tone": "15.1.22",

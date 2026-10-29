@@ -1,4 +1,5 @@
 export type PracticeMode = 'note' | 'staff'
+export type BassStringCount = 4 | 5
 export type Accidental = 'sharp' | 'flat' | null
 
 export interface ExerciseTarget {
@@ -18,6 +19,7 @@ const SPANISH_NAMES: Record<string, string> = {
 }
 
 export const LOW_B_MIDI = 23
+export const LOW_E_MIDI = 28
 export const HIGH_G_MIDI = 55
 
 function positiveModulo(value: number, divisor: number) {
@@ -42,8 +44,8 @@ export function targetForMidi(midi: number, preferFlats = false): ExerciseTarget
   }
 }
 
-export function randomTarget(mode: PracticeMode, previous?: ExerciseTarget): ExerciseTarget {
-  const min = mode === 'staff' ? LOW_B_MIDI : 0
+export function randomTarget(mode: PracticeMode, previous?: ExerciseTarget, stringCount: BassStringCount = 5): ExerciseTarget {
+  const min = mode === 'staff' ? stringCount === 4 ? LOW_E_MIDI : LOW_B_MIDI : 0
   const max = mode === 'staff' ? HIGH_G_MIDI : 11
   let midi = min + Math.floor(Math.random() * (max - min + 1))
 

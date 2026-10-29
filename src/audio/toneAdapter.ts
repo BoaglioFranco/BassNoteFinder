@@ -15,21 +15,35 @@ export interface RhythmAudioPort {
   dispose(): void
 }
 
-const DRUM_URLS = {
-  kick1: '/audio/drums/kick-1.m4a',
-  kick2: '/audio/drums/kick-2.m4a',
-  snare1: '/audio/drums/snare-1.m4a',
-  snare2: '/audio/drums/snare-2.m4a',
-  hihat1: '/audio/drums/hihat-1.m4a',
-  hihat2: '/audio/drums/hihat-2.m4a',
-} as const
+type PercussionVoice = Extract<RhythmEvent['voice'], 'kick' | 'snare' | 'hihat'>
+type PulseSynthBank = {
+  click: Tone.PolySynth<Tone.Synth>
+  woodblock: Tone.PolySynth<Tone.Synth>
+}
+
+type CueSynthBank = {
+  synthBass: Tone.PolySynth<Tone.Synth>
+}
+
+type BassSampleVoice = Extract<RhythmEvent['voice'], 'bass' | 'pickedBass'>
+
+const DRUM_SAMPLES: Record<PercussionVoice, readonly [string, string]> = {
+  kick: ['/audio/drums/kick-1.m4a', '/audio/drums/kick-2.m4a'],
+  snare: ['/audio/drums/snare-1.m4a', '/audio/drums/snare-2.m4a'],
+  hihat: ['/audio/drums/hihat-1.m4a', '/audio/drums/hihat-2.m4a'],
+}
+
+// The source recordings have very different peak levels. These trims bring
+// them into the same useful range while leaving headroom for layered hits.
+const DRUM_TRIM_DB: Record<PercussionVoice, number> = { kick: 8, snare: 0, hihat: 18 }
 
 /** Tone.js owns clocking, look-ahead scheduling, buffer reuse, and draw sync. */
 export class ToneRhythmAudio implements RhythmAudioPort {
   private master?: Tone.Gain
-  private click?: Tone.Synth
-  private woodblock?: Tone.Synth
-  private drums?: Tone.Players
+  private pulseSynths?: PulseSynthBank
+  private cueSynths?: CueSynthBank
+  private drums?: Record<PercussionVoice, Tone.Sampler[]>
+  private bassSamples?: Record<BassSampleVoice, Tone.Sampler>
   private prepared = false
   private volume = 0.7
   private roundRobin = { kick: 0, snare: 0, hihat: 0 }
@@ -38,17 +52,17 @@ export class ToneRhythmAudio implements RhythmAudioPort {
     await Tone.start()
     if (!this.prepared) {
       this.master = new Tone.Gain(this.volume).toDestination()
-      this.click = new Tone.Synth({
-        oscillator: { type: 'square' },
-        envelope: { attack: 0.001, decay: 0.025, sustain: 0, release: 0.01 },
-        volume: -10,
-      }).connect(this.master)
-      this.woodblock = new Tone.Synth({
-        oscillator: { type: 'sine' },
-        envelope: { attack: 0.001, decay: 0.055, sustain: 0, release: 0.025 },
-        volume: -7,
-      }).connect(this.master)
-      this.drums = new Tone.Players({ urls: DRUM_URLS, fadeOut: 0.015, volume: -5 }).connect(this.master)
+      this.pulseSynths = this.createPulseSynthBank(this.master)
+      this.cueSynths = this.createCueSynthBank(this.master)
+      this.drums = {
+        kick: this.createSamplerPool('kick', this.master),
+        snare: this.createSamplerPool('snare', this.master),
+        hihat: this.createSamplerPool('hihat', this.master),
+      }
+      this.bassSamples = {
+        bass: this.createBassSampler('/audio/bass/finger-e1.wav', this.master),
+        pickedBass: this.createBassSampler('/audio/bass/picked-e1.wav', this.master),
+      }
       this.prepared = true
     }
     await Tone.loaded()
@@ -86,7 +100,12 @@ export class ToneRhythmAudio implements RhythmAudioPort {
     const transport = Tone.getTransport()
     transport.stop()
     transport.position = 0
-    this.drums?.stopAll()
+    for (const synth of Object.values(this.pulseSynths ?? {})) synth.releaseAll()
+    for (const synth of Object.values(this.cueSynths ?? {})) synth.releaseAll()
+    for (const pool of Object.values(this.drums ?? {})) {
+      for (const sampler of pool) sampler.releaseAll()
+    }
+    for (const sampler of Object.values(this.bassSamples ?? {})) sampler.releaseAll()
     Tone.getDraw().cancel()
   }
 
@@ -99,25 +118,75 @@ export class ToneRhythmAudio implements RhythmAudioPort {
     const duration = `${durationTicks}i`
     if (event.voice === 'click') {
       const pitch = event.emphasis === 'downbeat' ? 'E6' : event.emphasis === 'beat' ? 'C6' : 'G5'
-      this.click?.triggerAttackRelease(pitch, duration, audioTime, event.velocity)
+      this.pulseSynths?.click.triggerAttackRelease(pitch, duration, audioTime, event.velocity)
     } else if (event.voice === 'woodblock') {
       const pitch = event.emphasis === 'downbeat' ? 'D6' : event.emphasis === 'beat' ? 'B5' : 'G5'
-      this.woodblock?.triggerAttackRelease(pitch, duration, audioTime, event.velocity)
+      this.pulseSynths?.woodblock.triggerAttackRelease(pitch, duration, audioTime, event.velocity)
+    } else if (event.voice === 'bass' || event.voice === 'pickedBass') {
+      this.bassSamples?.[event.voice].triggerAttackRelease('E1', duration, audioTime, event.velocity)
+    } else if (event.voice === 'synthBass') {
+      this.cueSynths?.synthBass.triggerAttackRelease('E1', duration, audioTime, event.velocity)
     } else if (event.voice === 'kick' || event.voice === 'snare' || event.voice === 'hihat') {
-      const variant = this.roundRobin[event.voice]++ % 2 + 1
-      this.drums?.player(`${event.voice}${variant}`).start(audioTime)
+      const pool = this.drums?.[event.voice]
+      const variant = this.roundRobin[event.voice]++ % 2
+      pool?.[variant].triggerAttack('C1', audioTime, event.velocity)
     }
+  }
+
+  private createPulseSynthBank(master: Tone.Gain): PulseSynthBank {
+    return {
+      click: new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: 'square' },
+        envelope: { attack: 0.001, decay: 0.025, sustain: 0, release: 0.01 },
+        volume: -10,
+      }).connect(master),
+      woodblock: new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: 'sine' },
+        envelope: { attack: 0.001, decay: 0.055, sustain: 0, release: 0.025 },
+        volume: -7,
+      }).connect(master),
+    }
+  }
+
+  private createCueSynthBank(master: Tone.Gain): CueSynthBank {
+    return {
+      synthBass: new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: 'sawtooth' },
+        envelope: { attack: 0.004, decay: 0.12, sustain: 0.5, release: 0.05 },
+        volume: -16,
+      }).connect(master),
+    }
+  }
+
+  private createBassSampler(url: string, master: Tone.Gain) {
+    return new Tone.Sampler({
+      urls: { E1: url },
+      release: 0.06,
+      volume: -5,
+    }).connect(master)
+  }
+
+  private createSamplerPool(voice: PercussionVoice, master: Tone.Gain) {
+    return DRUM_SAMPLES[voice].map((url) => new Tone.Sampler({
+      urls: { C1: url },
+      release: 0.02,
+      volume: DRUM_TRIM_DB[voice],
+    }).connect(master))
   }
 
   dispose() {
     this.stopTransport()
-    this.click?.dispose()
-    this.woodblock?.dispose()
-    this.drums?.dispose()
+    for (const synth of Object.values(this.pulseSynths ?? {})) synth.dispose()
+    for (const synth of Object.values(this.cueSynths ?? {})) synth.dispose()
+    for (const pool of Object.values(this.drums ?? {})) {
+      for (const sampler of pool) sampler.dispose()
+    }
+    for (const sampler of Object.values(this.bassSamples ?? {})) sampler.dispose()
     this.master?.dispose()
-    this.click = undefined
-    this.woodblock = undefined
+    this.pulseSynths = undefined
+    this.cueSynths = undefined
     this.drums = undefined
+    this.bassSamples = undefined
     this.master = undefined
     this.prepared = false
   }
