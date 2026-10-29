@@ -112,6 +112,7 @@ export default function BeatRuler() {
   const isCompactRuler = useMediaQuery('(max-width: 40.625em)')
   const [initial] = useState(loadDocument)
   const [settings, setSettings] = useState(initial.settings)
+  const [tempoInput, setTempoInput] = useState<string | number>(initial.settings.bpm)
   const [snap, setSnap] = useState(initial.snap)
   const [notes, setNotes] = useState(initial.notes)
   const [mode, setMode] = useState<RulerMode>('edit')
@@ -216,6 +217,22 @@ export default function BeatRuler() {
     setSnap(nextSnap)
   }
 
+  const changeTempoInput = (value: string | number) => {
+    setTempoInput(value)
+    if (value === '') return
+    const bpm = Number(value)
+    if (Number.isFinite(bpm) && bpm >= 30 && bpm <= 240) {
+      setSettings((current) => ({ ...current, bpm }))
+    }
+  }
+
+  const commitTempoInput = () => {
+    const value = tempoInput === '' ? settings.bpm : Number(tempoInput)
+    const bpm = Number.isFinite(value) ? Math.min(240, Math.max(30, value)) : settings.bpm
+    setTempoInput(bpm)
+    setSettings((current) => current.bpm === bpm ? current : { ...current, bpm })
+  }
+
   const addNote = (step: number) => {
     if (mode !== 'edit') return
     setNotes((current) => addBeatRulerNote(current, step, snap, totalSteps, `note-${nextId.current++}`))
@@ -244,8 +261,9 @@ export default function BeatRuler() {
         <Button type="button" leftSection={<Pencil size={15} />} variant={mode === 'edit' ? 'filled' : 'default'} className={mode === 'edit' ? 'selected' : ''} onClick={() => selectMode('edit')}>Edit</Button>
         <Button type="button" leftSection={<Play size={15} />} variant={mode === 'playback' ? 'filled' : 'default'} className={mode === 'playback' ? 'selected' : ''} onClick={() => selectMode('playback')}>Playback</Button>
       </Button.Group>
-      <NumberInput className="compact-tempo" label="BPM" aria-label="Beat ruler tempo in BPM" role="spinbutton" min={30} max={240} value={settings.bpm}
-        clampBehavior="strict" hideControls onChange={(value) => setSettings((current) => ({ ...current, bpm: Math.min(240, Math.max(30, Number(value) || 30)) }))} />
+      <NumberInput className="compact-tempo" label="BPM" aria-label="Beat ruler tempo in BPM" role="spinbutton" min={30} max={240}
+        value={tempoInput} clampBehavior="none" allowDecimal={false} allowNegative={false} inputMode="numeric" hideControls
+        onChange={changeTempoInput} onBlur={commitTempoInput} />
     </Group>
 
     <div className="ruler-track-stack" data-total-bars={settings.bars}

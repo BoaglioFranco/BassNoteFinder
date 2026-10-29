@@ -62,6 +62,21 @@ describe('Beat Ruler UI', () => {
     expect(localStorage.getItem('bass-beat-ruler')).toContain('"version":4')
   })
 
+  it('allows clearing and replacing the BPM without coercing partial input', () => {
+    render(<BeatRuler />)
+    const tempo = screen.getByRole('spinbutton', { name: 'Beat ruler tempo in BPM' }) as HTMLInputElement
+
+    fireEvent.change(tempo, { target: { value: '' } })
+    expect(tempo.value).toBe('')
+
+    fireEvent.change(tempo, { target: { value: '12' } })
+    expect(tempo.value).toBe('12')
+
+    fireEvent.change(tempo, { target: { value: '128' } })
+    expect(tempo.value).toBe('128')
+    expect(localStorage.getItem('bass-beat-ruler')).toContain('"bpm":128')
+  })
+
   it('migrates older documents to the duration-aware ruler cue', () => {
     localStorage.setItem('bass-beat-ruler', JSON.stringify({
       version: 2,
