@@ -123,7 +123,8 @@ export default function BeatRuler() {
   const engine = useRef<BeatRulerEngine | null>(null)
   const mounted = useRef(true)
   const drag = useRef<null | { kind: 'move' | 'resize', noteId: string, pointerOffsetSteps: number }>(null)
-  const longPress = useRef<null | { pointerId: number, startX: number, startY: number, timer: ReturnType<typeof setTimeout> }>(null)
+  const longPress = useRef<null | { pointerId: number, noteId: string, startX: number, startY: number, triggered: boolean, timer: ReturnType<typeof setTimeout> }>(null)
+  const suppressGridClickUntil = useRef(0)
   const nextId = useRef(notes.reduce((largest, note) => Math.max(largest, Number(note.id.split('-').pop()) || 0), 0) + 1)
   const stepsPerBar = totalStepsForBar(settings.beatsPerBar)
   const totalSteps = totalStepsForPattern(settings.beatsPerBar, settings.bars)
@@ -255,12 +256,17 @@ export default function BeatRuler() {
         data-row-bars={row.bars}
         onPointerMove={(event) => {
           const pending = longPress.current
-          if (pending?.pointerId === event.pointerId && Math.hypot(event.clientX - pending.startX, event.clientY - pending.startY) > 8) {
+          if (pending?.pointerId === event.pointerId && !pending.triggered && Math.hypot(event.clientX - pending.startX, event.clientY - pending.startY) > 8) {
             cancelLongPress()
           }
           resizeFromPointer(event.clientX, event.currentTarget, row.startStep, row.steps)
         }}
         onPointerUp={(event) => {
+          const pending = longPress.current
+          if (pending?.pointerId === event.pointerId && pending.triggered) {
+            suppressGridClickUntil.current = performance.now() + 500
+            setNotes((current) => removeBeatRulerNote(current, pending.noteId))
+          }
           cancelLongPress()
           drag.current = null
           event.currentTarget.releasePointerCapture?.(event.pointerId)
@@ -276,7 +282,14 @@ export default function BeatRuler() {
             className={`${step % GRID_STEPS_PER_BEAT === 0 ? 'beat' : ''} ${step % stepsPerBar === 0 ? 'bar-start' : ''}`}
             aria-label={`Add note at ${stepLabel(step, settings.beatsPerBar, settings.bars)}`}
             disabled={mode !== 'edit'}
-            onClick={() => addNote(step)}
+            onClick={(event) => {
+              if (performance.now() < suppressGridClickUntil.current) {
+                event.preventDefault()
+                suppressGridClickUntil.current = 0
+                return
+              }
+              addNote(step)
+            }}
           ><span>{step % GRID_STEPS_PER_BEAT === 0 ? Math.floor((step % stepsPerBar) / GRID_STEPS_PER_BEAT) + 1 : ['e', '&', 'a'][step % GRID_STEPS_PER_BEAT - 1]}</span></button>)}
         </div>
         <div className="ruler-bar-labels" aria-hidden="true">
@@ -311,12 +324,12 @@ export default function BeatRuler() {
                   const startX = event.clientX
                   const startY = event.clientY
                   const timer = setTimeout(() => {
-                    if (longPress.current?.pointerId !== pointerId) return
-                    longPress.current = null
+                    const pending = longPress.current
+                    if (pending?.pointerId !== pointerId) return
+                    pending.triggered = true
                     drag.current = null
-                    setNotes((current) => removeBeatRulerNote(current, note.id))
                   }, 550)
-                  longPress.current = { pointerId, startX, startY, timer }
+                  longPress.current = { pointerId, noteId: note.id, startX, startY, triggered: false, timer }
                 }
               }}
               onKeyDown={(event) => {
@@ -326,7 +339,13 @@ export default function BeatRuler() {
               }}
               onContextMenu={(event) => {
                 event.preventDefault()
-                if (mode === 'edit') setNotes((current) => removeBeatRulerNote(current, note.id))
+                if (mode !== 'edit') return
+                if (longPress.current) {
+                  longPress.current.triggered = true
+                  drag.current = null
+                } else {
+                  setNotes((current) => removeBeatRulerNote(current, note.id))
+                }
               }}>
               {includesAttack && <b aria-hidden="true">×</b>}
               <span />

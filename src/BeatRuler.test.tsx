@@ -99,9 +99,13 @@ describe('Beat Ruler UI', () => {
 
       fireEvent.pointerDown(note, { button: 0, pointerId: 9, pointerType: 'touch', clientX: 10, clientY: 80 })
       act(() => vi.advanceTimersByTime(550))
+      expect(note.isConnected).toBe(true)
+      fireEvent.pointerUp(track, { pointerId: 9, pointerType: 'touch', clientX: 10, clientY: 80 })
+      fireEvent.click(screen.getByRole('button', { name: 'Add note at 1' }))
 
       expect(note.isConnected).toBe(false)
       expect(screen.queryByTestId('ruler-note-note-0')).toBeNull()
+      expect(screen.queryByTestId('ruler-note-note-15')).toBeNull()
     } finally {
       vi.useRealTimers()
     }
